@@ -32,6 +32,11 @@ pub const vec = struct {
             @compileError("invalid vector type: " ++ @typeName(info.Vector.child));
     }
 
+    fn vectorLen(comptime T: type) comptime_int {
+        checkType(T);
+        return @typeInfo(T).Vector.len;
+    }
+
     pub inline fn zero(comptime T: type) T {
         checkType(T);
         return @splat(0);
@@ -77,18 +82,18 @@ pub const vec = struct {
 
     pub fn cross(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
         checkType(@TypeOf(a));
-        if (a.len != 3) @compileError("cross product is only defined for 3 elements vectors");
+        if (vectorLen(@TypeOf(a)) != 3) @compileError("cross product is only defined for 3 elements vectors");
 
         const T = Child(@TypeOf(a));
 
         // https://geometrian.com/programming/tutorials/cross-product/index.php
-        const tmp0 = @shuffle(T, a, undefined, Vec3i{ 3, 0, 2, 1 });
-        const tmp1 = @shuffle(T, b, undefined, Vec3i{ 3, 1, 0, 2 });
+        const tmp0 = @shuffle(T, a, undefined, Vec3i{ 1, 2, 0 });
+        const tmp1 = @shuffle(T, b, undefined, Vec3i{ 2, 0, 1 });
 
         const tmp2 = tmp0 * b;
         const tmp3 = tmp0 * tmp1;
 
-        const tmp4 = @shuffle(T, tmp2, undefined, Vec3i{ 3, 0, 2, 1 });
+        const tmp4 = @shuffle(T, tmp2, undefined, Vec3i{ 1, 2, 0 });
 
         return tmp3 - tmp4;
     }
@@ -108,7 +113,7 @@ pub const vec = struct {
         return @reduce(.And, a == b);
     }
 
-    pub const Component = enum(usize) { x = 0, y = 1, z = 2, w = 3 };
+    pub const Component = enum(isize) { x = 0, y = 1, z = 2, w = 3 };
 
     pub fn swizzle2(
         v: anytype,
@@ -116,7 +121,7 @@ pub const vec = struct {
         comptime c1: Component,
     ) @Vector(2, Child(@TypeOf(v))) {
         checkType(@TypeOf(v));
-        const mask = Vec4i{ @intFromEnum(c0), @intFromEnum(c1) };
+        const mask = Vec2i{ @intFromEnum(c0), @intFromEnum(c1) };
         return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
     }
 
@@ -127,7 +132,7 @@ pub const vec = struct {
         comptime c2: Component,
     ) @Vector(3, Child(@TypeOf(v))) {
         checkType(@TypeOf(v));
-        const mask = Vec4i{ @intFromEnum(c0), @intFromEnum(c1), @intFromEnum(c2) };
+        const mask = Vec3i{ @intFromEnum(c0), @intFromEnum(c1), @intFromEnum(c2) };
         return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
     }
 
@@ -143,17 +148,14 @@ pub const vec = struct {
         return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
     }
 
-    fn vectorLen(v: anytype) comptime_int {
+    pub fn cast(comptime T: type, v: anytype) @Vector(vectorLen(@TypeOf(v)), T) {
         checkType(@TypeOf(v));
-        return v.len;
-    }
-
-    pub fn cast(comptime T: type, v: anytype) @Vector(vectorLen(v), T) {
         const info = @typeInfo(T);
         if (info != .Float and info != .Int) @compileError("invalid vector type: " ++ @typeName(T));
 
-        var out: [v.len]T = undefined;
-        inline for (0..v.len) |i| {
+        const len = vectorLen(@TypeOf(v));
+        var out: [len]T = undefined;
+        inline for (0..len) |i| {
             out[i] = std.math.lossyCast(T, v[i]);
         }
         return out;
@@ -183,4 +185,85 @@ test "vec.dot" {
     const d = vec.dot(x, y);
 
     try testing.expectApproxEqRel(89, d, 0.0001);
+}
+
+test "vec.length" {
+    const v = Vec3{ 3, 4, 5 };
+
+    try testing.expectApproxEqRel(50, vec.length2(v), 0.0001);
+    try testing.expectApproxEqRel(7.0710, vec.length(v), 0.0001);
+}
+
+test "vec.normalize" {
+    const v = Vec2{ 3, 4 };
+    const n = vec.normalize(v);
+
+    try testing.expectApproxEqRel(0.6, n[0], 0.0001);
+    try testing.expectApproxEqRel(0.8, n[1], 0.0001);
+}
+
+test "vec.cross" {
+    const a = Vec3i{ 3, 9, 2 };
+    const b = Vec3i{ 1, 8, 6 };
+    const c = vec.cross(a, b);
+
+    try testing.expectEqual(38, c[0]);
+    try testing.expectEqual(-16, c[1]);
+    try testing.expectEqual(15, c[2]);
+}
+
+test "vec.distance" {
+    const v0 = Vec3{ 8, 2, 1 };
+    const v1 = Vec3{ 2, 9, 6 };
+
+    try testing.expectApproxEqRel(110, vec.distance2(v0, v1), 0.0001);
+    try testing.expectApproxEqRel(10.4880, vec.distance(v0, v1), 0.0001);
+}
+
+test "vec.eql" {
+    const v0 = Vec3{ 8, 2, 1 };
+    const v1 = Vec3{ 2, 9, 6 };
+    const v2 = Vec3{ 2, 9, 6 };
+
+    try testing.expect(!vec.eql(v0, v1));
+    try testing.expect(vec.eql(v2, v1));
+
+    const v0i = Vec3{ 8, 2, 1 };
+    const v1i = Vec3{ 2, 9, 6 };
+    const v2i = Vec3{ 2, 9, 6 };
+
+    try testing.expect(!vec.eql(v0i, v1i));
+    try testing.expect(vec.eql(v2i, v1i));
+}
+
+test "vec.swizzle" {
+    const v = Vec4i{ 82, 12, 97, 26 };
+
+    try testing.expect(vec.eql(vec.swizzle2(v, .x, .x), .{ 82, 82 }));
+    try testing.expect(vec.eql(vec.swizzle2(v, .x, .w), .{ 82, 26 }));
+
+    try testing.expect(vec.eql(vec.swizzle3(v, .z, .z, .z), .{ 97, 97, 97 }));
+    try testing.expect(vec.eql(vec.swizzle3(v, .z, .y, .y), .{ 97, 12, 12 }));
+    try testing.expect(vec.eql(vec.swizzle3(v, .x, .y, .z), .{ 82, 12, 97 }));
+
+    try testing.expect(vec.eql(vec.swizzle4(v, .w, .w, .w, .w), .{ 26, 26, 26, 26 }));
+    try testing.expect(vec.eql(vec.swizzle4(v, .x, .y, .z, .w), .{ 82, 12, 97, 26 }));
+    try testing.expect(vec.eql(vec.swizzle4(v, .y, .y, .x, .z), .{ 12, 12, 82, 97 }));
+    try testing.expect(vec.eql(vec.swizzle4(v, .z, .x, .x, .y), .{ 97, 82, 82, 12 }));
+}
+
+test "vec.cast" {
+    const a = Vec4{ 8, 2, -4, 1 };
+    const b = vec.cast(i32, a);
+    const c = vec.cast(u32, b);
+
+    try testing.expect(vec.eql(b, .{ 8, 2, -4, 1 }));
+    try testing.expect(vec.eql(c, .{ 8, 2, 0, 1 }));
+
+    const x = Vec3i{ 8, 6, -5 };
+    const y = vec.cast(f32, x);
+    const z = vec.cast(i16, y);
+
+    try testing.expect(vec.eql(y, .{ 8, 6, -5 }));
+    try testing.expect(vec.eql(z, .{ 8, 6, -5 }));
 }
