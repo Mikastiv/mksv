@@ -21,6 +21,68 @@ pub const Mat2 = [2]Vec2;
 pub const Mat3 = [3]Vec3;
 pub const Mat4 = [4]Vec4;
 
+pub const Plane = struct {
+    data: Vec4,
+
+    pub fn init(p: Vec3, n: Vec3) Plane {
+        const x = vec.normalize(n);
+        const d = vec.dot(-x, p);
+        return .{ .data = .{ x[0], x[1], x[2], d } };
+    }
+
+    pub fn pointDistance(self: Plane, point: Vec3) f32 {
+        assert(vec.length(self.normal()) == 1);
+        return vec.dot(self.data, .{ point[0], point[1], point[2], 1 });
+    }
+
+    pub fn normal(self: Plane) Vec3 {
+        return .{ self.data[0], self.data[1], self.data[2] };
+    }
+};
+
+pub const Frustum = struct {
+    pub const Side = enum(u8) { top = 0, bottom, left, right, near, far };
+    const side_count = @typeInfo(Side).Enum.fields.len;
+
+    planes: [side_count]Plane,
+
+    pub fn init(fov: f32, aspect: f32, near: f32, far: f32, pos: Vec3, forward: Vec3) Frustum {
+        assert(fov > 0);
+        assert(vec.length(forward) == 1);
+
+        const right = vec.normalize(vec.cross(forward, .{ 0, 1, 0 }));
+        const up = vec.normalize(vec.cross(right, forward));
+
+        const half_v_side = far * @tan(fov / 2);
+        const half_h_side = half_v_side * aspect;
+        const forward_far = vec.mul(forward, far);
+
+        const near_plane = Plane.init(pos + vec.mul(forward, near));
+        const far_plane = Plane.init(pos + forward_far, -forward);
+        const right_plane = Plane.init(pos, vec.cross(forward_far - vec.mul(right, half_h_side), up));
+        const left_plane = Plane.init(pos, vec.cross(up, forward_far + vec.mul(right, half_h_side)));
+        const top_plane = Plane.init(pos, vec.cross(right, forward_far - vec.mul(up, half_v_side)));
+        const bottom_plane = Plane.init(pos, vec.cross(forward_far + vec.mul(up, half_v_side), right));
+
+        var planes: [side_count]Plane = undefined;
+        planes[@intFromEnum(Side.top)] = top_plane;
+        planes[@intFromEnum(Side.bottom)] = bottom_plane;
+        planes[@intFromEnum(Side.left)] = left_plane;
+        planes[@intFromEnum(Side.right)] = right_plane;
+        planes[@intFromEnum(Side.near)] = near_plane;
+        planes[@intFromEnum(Side.far)] = far_plane;
+
+        return .{ .planes = planes };
+    }
+
+    pub fn isPointInside(self: *const @This(), point: Vec3) bool {
+        for (&self.planes) |plane| {
+            if (plane.pointDistance(point) < 0) return false;
+        }
+        return true;
+    }
+};
+
 pub const vec = struct {
     fn checkType(comptime T: type) void {
         const info = @typeInfo(T);
@@ -76,13 +138,13 @@ pub const vec = struct {
 
     pub fn normalize(v: anytype) @TypeOf(v) {
         checkType(@TypeOf(v));
-        const mag = magnitude(v);
-        return div(v, mag);
+        const len = length(v);
+        return div(v, len);
     }
 
     pub fn cross(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
         checkType(@TypeOf(a));
-        if (vectorLen(@TypeOf(a)) != 3) @compileError("cross product is only defined for 3 elements vectors");
+        if (vectorLen(@TypeOf(a)) != 3) @compileError("cross product is only defined for 3-element vectors");
 
         const T = Child(@TypeOf(a));
 
@@ -113,7 +175,7 @@ pub const vec = struct {
         return @reduce(.And, a == b);
     }
 
-    pub const Component = enum(isize) { x = 0, y = 1, z = 2, w = 3 };
+    pub const Component = enum(usize) { x = 0, y = 1, z = 2, w = 3 };
 
     pub fn swizzle2(
         v: anytype,
@@ -148,6 +210,7 @@ pub const vec = struct {
         return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
     }
 
+    /// Lossy cast
     pub fn cast(comptime T: type, v: anytype) @Vector(vectorLen(@TypeOf(v)), T) {
         checkType(@TypeOf(v));
         const info = @typeInfo(T);
@@ -168,14 +231,17 @@ test "vec.zero" {
     try testing.expectEqual(x, y);
 }
 
+test "vec.neg" {
+    const v = Vec4i{ 8, 2, 1, 4 };
+
+    try testing.expect(vec.eql(-v, .{ -8, -2, -1, -4 }));
+}
+
 test "vec.mul" {
     const x = Vec4{ 1, 8, 2, 0 };
     const y = vec.mul(x, 4);
 
-    try testing.expectApproxEqRel(4, y[0], 0.0001);
-    try testing.expectApproxEqRel(32, y[1], 0.0001);
-    try testing.expectApproxEqRel(8, y[2], 0.0001);
-    try testing.expectApproxEqRel(0, y[3], 0.0001);
+    try testing.expect(vec.eql(y, .{ 4, 32, 8, 0 }));
 }
 
 test "vec.dot" {
@@ -266,4 +332,17 @@ test "vec.cast" {
 
     try testing.expect(vec.eql(y, .{ 8, 6, -5 }));
     try testing.expect(vec.eql(z, .{ 8, 6, -5 }));
+}
+
+test "plane.pointDistance" {
+    const p = Plane.init(.{ 6, 7, 2 }, .{ 8, 3, 1 });
+    const n = p.normal();
+    const dist = p.pointDistance(.{ 10, 9, 4 });
+
+    try testing.expectApproxEqRel(4.65, dist, 0.0001);
+    try testing.expect(vec.eql(n, vec.normalize(Vec3{ 8, 3, 1 })));
+}
+
+test "frustum" {
+    if (Frustum.side_count != 6) @compileError("invalid frustum side count");
 }
