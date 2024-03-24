@@ -2,6 +2,7 @@ const std = @import("std");
 
 const assert = std.debug.assert;
 const testing = std.testing;
+const float_tolerance = 0.0001;
 
 const Child = std.meta.Child;
 
@@ -31,7 +32,7 @@ pub const Plane = struct {
     }
 
     pub fn pointDistance(self: Plane, point: Vec3) f32 {
-        assert(vec.length(self.normal()) == 1);
+        checkNormalized(self.normal());
         return vec.dot(self.data, .{ point[0], point[1], point[2], 1 });
     }
 
@@ -41,14 +42,16 @@ pub const Plane = struct {
 };
 
 pub const Frustum = struct {
-    pub const Side = enum(u8) { top = 0, bottom, left, right, near, far };
+    const check_sides: void = if (Frustum.side_count != 6) @compileError("invalid side count") else {};
+
+    pub const Side = enum(u8) { near = 0, far, left, right, top, bottom };
     const side_count = @typeInfo(Side).Enum.fields.len;
 
     planes: [side_count]Plane,
 
     pub fn init(fov: f32, aspect: f32, near: f32, far: f32, pos: Vec3, forward: Vec3) Frustum {
         assert(fov > 0);
-        assert(vec.length(forward) == 1);
+        checkNormalized(forward);
 
         const right = vec.normalize(vec.cross(forward, .{ 0, 1, 0 }));
         const up = vec.normalize(vec.cross(right, forward));
@@ -57,20 +60,17 @@ pub const Frustum = struct {
         const half_h_side = half_v_side * aspect;
         const forward_far = vec.mul(forward, far);
 
-        const near_plane = Plane.init(pos + vec.mul(forward, near));
-        const far_plane = Plane.init(pos + forward_far, -forward);
-        const right_plane = Plane.init(pos, vec.cross(forward_far - vec.mul(right, half_h_side), up));
-        const left_plane = Plane.init(pos, vec.cross(up, forward_far + vec.mul(right, half_h_side)));
-        const top_plane = Plane.init(pos, vec.cross(right, forward_far - vec.mul(up, half_v_side)));
-        const bottom_plane = Plane.init(pos, vec.cross(forward_far + vec.mul(up, half_v_side), right));
-
         var planes: [side_count]Plane = undefined;
-        planes[@intFromEnum(Side.top)] = top_plane;
-        planes[@intFromEnum(Side.bottom)] = bottom_plane;
-        planes[@intFromEnum(Side.left)] = left_plane;
-        planes[@intFromEnum(Side.right)] = right_plane;
-        planes[@intFromEnum(Side.near)] = near_plane;
-        planes[@intFromEnum(Side.far)] = far_plane;
+        for (std.enums.values(Side)) |side| {
+            planes[@intFromEnum(side)] = switch (side) {
+                .near => Plane.init(pos + vec.mul(forward, near), forward),
+                .far => Plane.init(pos + forward_far, -forward),
+                .left => Plane.init(pos, vec.cross(up, forward_far + vec.mul(right, half_h_side))),
+                .right => Plane.init(pos, vec.cross(forward_far - vec.mul(right, half_h_side), up)),
+                .top => Plane.init(pos, vec.cross(right, forward_far - vec.mul(up, half_v_side))),
+                .bottom => Plane.init(pos, vec.cross(forward_far + vec.mul(up, half_v_side), right)),
+            };
+        }
 
         return .{ .planes = planes };
     }
@@ -225,6 +225,11 @@ pub const vec = struct {
     }
 };
 
+fn checkNormalized(v: anytype) void {
+    const len = vec.length(v);
+    assert(std.math.approxEqRel(f32, len, 1, float_tolerance));
+}
+
 test "vec.zero" {
     const x = vec.zero(Vec4);
     const y = Vec4{ 0, 0, 0, 0 };
@@ -250,22 +255,22 @@ test "vec.dot" {
 
     const d = vec.dot(x, y);
 
-    try testing.expectApproxEqRel(89, d, 0.0001);
+    try testing.expectApproxEqRel(89, d, float_tolerance);
 }
 
 test "vec.length" {
     const v = Vec3{ 3, 4, 5 };
 
-    try testing.expectApproxEqRel(50, vec.length2(v), 0.0001);
-    try testing.expectApproxEqRel(7.0710, vec.length(v), 0.0001);
+    try testing.expectApproxEqRel(50, vec.length2(v), float_tolerance);
+    try testing.expectApproxEqRel(7.0710, vec.length(v), float_tolerance);
 }
 
 test "vec.normalize" {
     const v = Vec2{ 3, 4 };
     const n = vec.normalize(v);
 
-    try testing.expectApproxEqRel(0.6, n[0], 0.0001);
-    try testing.expectApproxEqRel(0.8, n[1], 0.0001);
+    try testing.expectApproxEqRel(0.6, n[0], float_tolerance);
+    try testing.expectApproxEqRel(0.8, n[1], float_tolerance);
 }
 
 test "vec.cross" {
@@ -282,8 +287,8 @@ test "vec.distance" {
     const v0 = Vec3{ 8, 2, 1 };
     const v1 = Vec3{ 2, 9, 6 };
 
-    try testing.expectApproxEqRel(110, vec.distance2(v0, v1), 0.0001);
-    try testing.expectApproxEqRel(10.4880, vec.distance(v0, v1), 0.0001);
+    try testing.expectApproxEqRel(110, vec.distance2(v0, v1), float_tolerance);
+    try testing.expectApproxEqRel(10.4880, vec.distance(v0, v1), float_tolerance);
 }
 
 test "vec.eql" {
@@ -339,10 +344,22 @@ test "plane.pointDistance" {
     const n = p.normal();
     const dist = p.pointDistance(.{ 10, 9, 4 });
 
-    try testing.expectApproxEqRel(4.65, dist, 0.0001);
+    try testing.expectApproxEqRel(4.65, dist, float_tolerance);
     try testing.expect(vec.eql(n, vec.normalize(Vec3{ 8, 3, 1 })));
 }
 
-test "frustum" {
-    if (Frustum.side_count != 6) @compileError("invalid frustum side count");
+test "frustum.isPointInside" {
+    const forward = Vec3{ 0, 0, 1 };
+    const frustum = Frustum.init(std.math.degreesToRadians(80), 16.0 / 9.0, 1, 100, .{ 0, 0, 0 }, forward);
+
+    try testing.expect(frustum.isPointInside(.{ 0, 0, 50 }));
+    try testing.expect(frustum.isPointInside(.{ 0, 41.95, 50 }));
+    try testing.expect(!frustum.isPointInside(.{ 0, 42, 50 }));
+    try testing.expect(frustum.isPointInside(.{ 74.58, 41.95, 50 }));
+    try testing.expect(frustum.isPointInside(.{ -74.58, 41.95, 50 }));
+    try testing.expect(!frustum.isPointInside(.{ 74.59, 41.95, 50 }));
+    try testing.expect(frustum.isPointInside(.{ 0, 0, 100 }));
+    try testing.expect(!frustum.isPointInside(.{ 0, 0, 100.5 }));
+    try testing.expect(!frustum.isPointInside(.{ 0, 0, -100 }));
+    try testing.expect(!frustum.isPointInside(.{ 0, 0, 0.5 }));
 }
