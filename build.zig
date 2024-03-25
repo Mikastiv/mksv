@@ -4,15 +4,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
-        .name = "mksv",
-        .root_source_file = .{ .path = "src/root.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
-    b.installArtifact(lib);
-
     const mksv = b.addModule("mksv", .{
         .root_source_file = .{ .path = "src/root.zig" },
         .target = target,

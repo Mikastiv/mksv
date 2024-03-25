@@ -210,6 +210,45 @@ pub const vec = struct {
         return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
     }
 
+    fn unsupportedType(comptime T: type) void {
+        @compileError("unsupported type: " ++ @typeName(T));
+    }
+
+    pub fn vec2(v: anytype) @Vector(2, Child(@TypeOf(v))) {
+        const len = vectorLen(@TypeOf(v));
+        return switch (len) {
+            3, 4 => .{ v[0], v[1] },
+            else => unsupportedType(@TypeOf(v)),
+        };
+    }
+
+    pub fn vec3(v: anytype) @Vector(3, Child(@TypeOf(v))) {
+        const len = vectorLen(@TypeOf(v));
+        return switch (len) {
+            2 => .{ v[0], v[1], 0 },
+            4 => .{ v[0], v[1], v[2] },
+            else => unsupportedType(@TypeOf(v)),
+        };
+    }
+
+    pub fn vec4(v: anytype) @Vector(4, Child(@TypeOf(v))) {
+        const len = vectorLen(@TypeOf(v));
+        return switch (len) {
+            2 => .{ v[0], v[1], 0, 1 },
+            3 => .{ v[0], v[1], v[2], 1 },
+            else => unsupportedType(@TypeOf(v)),
+        };
+    }
+
+    pub fn vec4Dir(v: anytype) @Vector(4, Child(@TypeOf(v))) {
+        const len = vectorLen(@TypeOf(v));
+        return switch (len) {
+            2 => .{ v[0], v[1], 0, 0 },
+            3 => .{ v[0], v[1], v[2], 0 },
+            else => unsupportedType(@TypeOf(v)),
+        };
+    }
+
     /// Lossy cast
     pub fn cast(comptime T: type, v: anytype) @Vector(vectorLen(@TypeOf(v)), T) {
         checkType(@TypeOf(v));

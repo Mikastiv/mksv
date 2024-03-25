@@ -2,49 +2,16 @@ const std = @import("std");
 const mksv = @import("mksv");
 const math = mksv.math;
 
-// const RwLock = mksv.RwLock;
+pub fn main() !u8 {
+    const f = math.Frustum.init(std.math.degreesToRadians(80), 16.0 / 9.0, 0.1, 10000, .{ 0, 0, 0 }, .{ 0, 0, 1 });
 
-// fn testRwLockReader(lock: *RwLock, value: *usize) void {
-//     const read_count = 10000;
+    var args = try std.process.argsWithAllocator(std.heap.page_allocator);
+    if (args.next()) |_| {
+        if (f.isPointInside(.{ 0, 0, 38 })) {
+            return 1;
+        }
+        return 2;
+    }
 
-//     var i: usize = 0;
-//     while (i < read_count) : (i += 1) {
-//         lock.lockShared();
-//         defer lock.unlockShared();
-
-//         if (value.* < 20000) {
-//             i += 1;
-//         }
-//     }
-// }
-
-// fn testRwLockWriter(lock: *RwLock, value: *usize) void {
-//     const write_count = 10000;
-
-//     var i: usize = 0;
-//     while (i < write_count) : (i += 1) {
-//         lock.lock();
-//         defer lock.unlock();
-
-//         value.* += 1;
-//     }
-// }
-
-pub fn main() !void {
-    // var lock = RwLock.init();
-    // var value: usize = 0;
-
-    // const num_readers = 6;
-    // const num_writers = 2;
-
-    // var threads: [num_readers + num_writers]std.Thread = undefined;
-    // for (threads[0..num_readers]) |*t| t.* = try std.Thread.spawn(.{}, testRwLockReader, .{ &lock, &value });
-    // for (threads[num_readers..]) |*t| t.* = try std.Thread.spawn(.{}, testRwLockWriter, .{ &lock, &value });
-
-    // for (threads) |t| t.join();
-
-    // std.debug.assert(value == num_writers * 10000);
-
-    const x = math.vec.zero(math.Vec3);
-    std.log.info("{any}", .{x});
+    return 0;
 }
