@@ -210,10 +210,6 @@ pub const vec = struct {
         return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
     }
 
-    fn unsupportedType(comptime T: type) void {
-        @compileError("unsupported type: " ++ @typeName(T));
-    }
-
     pub fn vec2(v: anytype) @Vector(2, Child(@TypeOf(v))) {
         const len = vectorLen(@TypeOf(v));
         return switch (len) {
@@ -263,6 +259,155 @@ pub const vec = struct {
         return out;
     }
 };
+
+pub const mat = struct {
+    fn checkType(comptime T: type) void {
+        const info = @typeInfo(T);
+        if (info != .Array)
+            @compileError("invalid type: " ++ @typeName(T));
+
+        const child = @typeInfo(info.Array.child);
+        if (child != .Vector)
+            @compileError("invalid matrix child type: " ++ @typeName(info.Array.child));
+
+        const underlying_type = @typeInfo(child.Vector.child);
+        if (underlying_type != .Float and underlying_type != .Int)
+            @compileError("invalid underlying matrix type: " ++ @typeName(child.Vector.child));
+    }
+
+    fn matsize(comptime T: type) comptime_int {
+        checkType(T);
+
+        const info = @typeInfo(T);
+
+        const w = vec.vectorLen(Child(T));
+        const h = info.Array.len;
+        if (w != h) @compileError("non square matrix are not supported");
+
+        return switch (T) {
+            Mat2, Mat3, Mat4 => w,
+            else => unsupportedType(T),
+        };
+    }
+
+    pub fn mat2(m: anytype) [2]@Vector(2, Child(Child(@TypeOf(m)))) {
+        const T = @TypeOf(m);
+        const size = matsize(T);
+        return switch (size) {
+            3, 4 => .{
+                vec.vec2(m[0]),
+                vec.vec2(m[1]),
+            },
+            else => unsupportedType(T),
+        };
+    }
+
+    pub fn mat3(m: anytype) [3]@Vector(3, Child(Child(@TypeOf(m)))) {
+        const T = @TypeOf(m);
+        const size = matsize(T);
+        return switch (size) {
+            2 => .{
+                vec.vec3(m[0]),
+                vec.vec3(m[1]),
+                .{ 0, 0, 0 },
+            },
+            4 => .{
+                vec.vec3(m[0]),
+                vec.vec3(m[1]),
+                vec.vec3(m[2]),
+            },
+            else => unsupportedType(T),
+        };
+    }
+
+    pub fn mat4(m: anytype) [4]@Vector(4, Child(Child(@TypeOf(m)))) {
+        const T = @TypeOf(m);
+        const size = matsize(T);
+        return switch (size) {
+            2 => .{
+                vec.vec4(m[0]),
+                vec.vec4(m[1]),
+                .{ 0, 0, 0, 0 },
+                .{ 0, 0, 0, 0 },
+            },
+            3 => .{
+                vec.vec4(m[0]),
+                vec.vec4(m[1]),
+                vec.vec4(m[2]),
+                .{ 0, 0, 0, 0 },
+            },
+            else => unsupportedType(T),
+        };
+    }
+
+    pub fn zero(comptime T: type) T {
+        checkType(T);
+        return std.mem.zeroes(T);
+    }
+
+    pub fn identity(comptime T: type) T {
+        const size = matsize(T);
+
+        var out = std.mem.zeroes(T);
+        inline for (0..size) |i| {
+            out[i][i] = 1;
+        }
+
+        return out;
+    }
+
+    pub fn add(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
+        const T = @TypeOf(a);
+        const size = matsize(T);
+
+        var out: T = undefined;
+        inline for (0..size) |i| {
+            out[i] = a[i] + b[i];
+        }
+
+        return out;
+    }
+
+    pub fn sub(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
+        const T = @TypeOf(a);
+        const size = matsize(T);
+
+        var out: T = undefined;
+        inline for (0..size) |i| {
+            out[i] = a[i] - b[i];
+        }
+
+        return out;
+    }
+
+    pub fn mulScalar(a: anytype, b: Child(Child(@TypeOf(a)))) @TypeOf(a) {
+        const T = @TypeOf(a);
+        const size = matsize(T);
+
+        var out: T = undefined;
+        inline for (0..size) |i| {
+            out[i] = vec.mul(a[i], b);
+        }
+
+        return out;
+    }
+
+    pub fn divScalar(a: anytype, b: Child(Child(@TypeOf(a)))) @TypeOf(a) {
+        const T = @TypeOf(a);
+        const size = matsize(T);
+
+        var out: T = undefined;
+        inline for (0..size) |i| {
+            out[i] = vec.div(a[i], b);
+        }
+
+        return out;
+    }
+};
+
+fn unsupportedType(comptime T: type) void {
+    @compileError("unsupported type: " ++ @typeName(T));
+}
 
 fn checkNormalized(v: anytype) void {
     const len = vec.length(v);
@@ -401,4 +546,12 @@ test "frustum.isPointInside" {
     try testing.expect(!frustum.isPointInside(.{ 0, 0, 100.5 }));
     try testing.expect(!frustum.isPointInside(.{ 0, 0, -100 }));
     try testing.expect(!frustum.isPointInside(.{ 0, 0, 0.5 }));
+}
+
+test "mat.add" {
+    const a = mat.identity(Mat4);
+    const b = mat.identity(Mat4);
+    const c = mat.add(a, b);
+
+    try testing.expectEqual(2, c[1][1]);
 }
