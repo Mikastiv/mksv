@@ -18,6 +18,9 @@ pub const Vec4i = @Vector(4, i32);
 pub const Vec2 = @Vector(2, f32);
 pub const Vec3 = @Vector(3, f32);
 pub const Vec4 = @Vector(4, f32);
+pub const Mat2i = [2]Vec2i;
+pub const Mat3i = [3]Vec3i;
+pub const Mat4i = [4]Vec4i;
 pub const Mat2 = [2]Vec2;
 pub const Mat3 = [3]Vec3;
 pub const Mat4 = [4]Vec4;
@@ -284,10 +287,7 @@ pub const mat = struct {
         const h = info.Array.len;
         if (w != h) @compileError("non square matrix are not supported");
 
-        return switch (T) {
-            Mat2, Mat3, Mat4 => w,
-            else => unsupportedType(T),
-        };
+        return w;
     }
 
     pub fn mat2(m: anytype) [2]@Vector(2, Child(Child(@TypeOf(m)))) {
@@ -404,27 +404,67 @@ pub const mat = struct {
         return out;
     }
 
-    pub fn mulVec(v: Vec4, m: Mat4) Vec4 {
-        const v0 = @shuffle(f32, v, undefined, Vec4i{ 0, 0, 0, 0 });
-        const v1 = @shuffle(f32, v, undefined, Vec4i{ 1, 1, 1, 1 });
-        const v2 = @shuffle(f32, v, undefined, Vec4i{ 2, 2, 2, 2 });
-        const v3 = @shuffle(f32, v, undefined, Vec4i{ 3, 3, 3, 3 });
-
-        const m0 = v0 * m[0];
-        const m1 = v1 * m[1];
-        const m2 = v2 * m[2];
-        const m3 = v3 * m[3];
-
-        const a0 = m0 + m1;
-        const a1 = m2 + m3;
-        const a2 = a0 + a1;
-
-        return a2;
+    fn Matrix(comptime Vec: type) type {
+        const vec_len = vec.veclen(Vec);
+        return [vec_len]@Vector(vec_len, Child(Vec));
     }
 
-    pub fn mul(a: Mat4, b: Mat4) Mat4 {
-        var out: Mat4 = undefined;
-        inline for (0..4) |i| {
+    pub fn mulVec(v: anytype, m: Matrix(@TypeOf(v))) @TypeOf(v) {
+        const size = matsize(@TypeOf(m));
+
+        const T = Child(@TypeOf(v));
+
+        switch (size) {
+            2 => {
+                const v0 = @shuffle(T, v, undefined, Vec4i{ 0, 0, 1, 1 });
+                const m0 = @shuffle(T, m[0], m[1], Vec4i{ 0, 1, -1, -2 });
+
+                const a0 = v0 * m0;
+
+                const f0 = @shuffle(T, a0, undefined, Vec4i{ 2, 3, 2, 3 });
+                const g0 = a0 + f0;
+
+                return .{ g0[0], g0[1] };
+            },
+            3 => {
+                const v0 = @shuffle(T, v, undefined, Vec3i{ 0, 0, 0 });
+                const v1 = @shuffle(T, v, undefined, Vec3i{ 1, 1, 1 });
+                const v2 = @shuffle(T, v, undefined, Vec3i{ 2, 2, 2 });
+
+                const m0 = v0 * m[0];
+                const m1 = v1 * m[1];
+                const m2 = v2 * m[2];
+
+                const a0 = m0 + m1;
+
+                return a0 + m2;
+            },
+            4 => {
+                const v0 = @shuffle(T, v, undefined, Vec4i{ 0, 0, 0, 0 });
+                const v1 = @shuffle(T, v, undefined, Vec4i{ 1, 1, 1, 1 });
+                const v2 = @shuffle(T, v, undefined, Vec4i{ 2, 2, 2, 2 });
+                const v3 = @shuffle(T, v, undefined, Vec4i{ 3, 3, 3, 3 });
+
+                const m0 = v0 * m[0];
+                const m1 = v1 * m[1];
+                const m2 = v2 * m[2];
+                const m3 = v3 * m[3];
+
+                const a0 = m0 + m1;
+                const a1 = m2 + m3;
+
+                return a0 + a1;
+            },
+            else => @compileError("vector and matrix dimensions not supported"),
+        }
+    }
+
+    pub fn mul(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
+        const T = @TypeOf(a, b);
+        const size = matsize(T);
+
+        var out: T = undefined;
+        inline for (0..size) |i| {
             out[i] = mulVec(a[i], b);
         }
 
@@ -447,7 +487,7 @@ pub const mat = struct {
     pub fn debugPrint(m: anytype) void {
         const size = matsize(@TypeOf(m));
         for (0..size) |i| {
-            std.log.debug("{any}", .{m[i]});
+            std.log.err("{any}", .{m[i]});
         }
     }
 };
@@ -604,27 +644,66 @@ test "mat.add" {
 }
 
 test "mat.mul" {
-    const a = Mat4{
+    const a = Mat4i{
         .{ 3, 4, 8, 8 },
         .{ 9, 1, 5, 2 },
         .{ 8, 2, 8, 4 },
         .{ 9, 6, 5, 2 },
     };
-    const b = Mat4{
+    const b = Mat4i{
         .{ 7, 9, 1, 3 },
         .{ 8, 6, 2, 5 },
         .{ 3, 9, 1, 3 },
         .{ 0, 4, 2, 1 },
     };
-    const out = mat.mul(a, b);
+    const c = mat.mul(a, b);
 
     try testing.expectEqual(
-        Mat4{
+        Mat4i{
             .{ 77, 155, 35, 61 },
             .{ 86, 140, 20, 49 },
             .{ 96, 172, 28, 62 },
             .{ 126, 170, 30, 74 },
         },
-        out,
+        c,
+    );
+
+    const x = Mat3i{
+        .{ 3, 4, 8 },
+        .{ 9, 1, 5 },
+        .{ 8, 2, 8 },
+    };
+    const y = Mat3i{
+        .{ 7, 9, 1 },
+        .{ 8, 6, 2 },
+        .{ 3, 9, 1 },
+    };
+    const z = mat.mul(x, y);
+
+    try testing.expectEqual(
+        Mat3i{
+            .{ 77, 123, 19 },
+            .{ 86, 132, 16 },
+            .{ 96, 156, 20 },
+        },
+        z,
+    );
+
+    const t = Mat2i{
+        .{ 3, 4 },
+        .{ 9, 1 },
+    };
+    const u = Mat2i{
+        .{ 7, 9 },
+        .{ 8, 6 },
+    };
+    const v = mat.mul(t, u);
+
+    try testing.expectEqual(
+        Mat2i{
+            .{ 53, 51 },
+            .{ 71, 87 },
+        },
+        v,
     );
 }
