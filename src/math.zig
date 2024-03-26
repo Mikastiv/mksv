@@ -10,7 +10,7 @@ const Child = std.meta.Child;
 
 // Right handed
 
-// Column major
+// Row major
 
 pub const Vec2i = @Vector(2, i32);
 pub const Vec3i = @Vector(3, i32);
@@ -94,7 +94,7 @@ pub const vec = struct {
             @compileError("invalid vector type: " ++ @typeName(info.Vector.child));
     }
 
-    fn vectorLen(comptime T: type) comptime_int {
+    fn veclen(comptime T: type) comptime_int {
         checkType(T);
         return @typeInfo(T).Vector.len;
     }
@@ -142,9 +142,9 @@ pub const vec = struct {
         return div(v, len);
     }
 
-    pub fn cross(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
+    pub fn cross(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
         checkType(@TypeOf(a));
-        if (vectorLen(@TypeOf(a)) != 3) @compileError("cross product is only defined for 3-element vectors");
+        if (veclen(@TypeOf(a)) != 3) @compileError("cross product is only defined for 3-element vectors");
 
         const T = Child(@TypeOf(a));
 
@@ -211,7 +211,7 @@ pub const vec = struct {
     }
 
     pub fn vec2(v: anytype) @Vector(2, Child(@TypeOf(v))) {
-        const len = vectorLen(@TypeOf(v));
+        const len = veclen(@TypeOf(v));
         return switch (len) {
             3, 4 => .{ v[0], v[1] },
             else => unsupportedType(@TypeOf(v)),
@@ -219,7 +219,7 @@ pub const vec = struct {
     }
 
     pub fn vec3(v: anytype) @Vector(3, Child(@TypeOf(v))) {
-        const len = vectorLen(@TypeOf(v));
+        const len = veclen(@TypeOf(v));
         return switch (len) {
             2 => .{ v[0], v[1], 0 },
             4 => .{ v[0], v[1], v[2] },
@@ -228,7 +228,7 @@ pub const vec = struct {
     }
 
     pub fn vec4(v: anytype) @Vector(4, Child(@TypeOf(v))) {
-        const len = vectorLen(@TypeOf(v));
+        const len = veclen(@TypeOf(v));
         return switch (len) {
             2 => .{ v[0], v[1], 0, 1 },
             3 => .{ v[0], v[1], v[2], 1 },
@@ -237,7 +237,7 @@ pub const vec = struct {
     }
 
     pub fn vec4Dir(v: anytype) @Vector(4, Child(@TypeOf(v))) {
-        const len = vectorLen(@TypeOf(v));
+        const len = veclen(@TypeOf(v));
         return switch (len) {
             2 => .{ v[0], v[1], 0, 0 },
             3 => .{ v[0], v[1], v[2], 0 },
@@ -246,12 +246,12 @@ pub const vec = struct {
     }
 
     /// Lossy cast
-    pub fn cast(comptime T: type, v: anytype) @Vector(vectorLen(@TypeOf(v)), T) {
+    pub fn cast(comptime T: type, v: anytype) @Vector(veclen(@TypeOf(v)), T) {
         checkType(@TypeOf(v));
         const info = @typeInfo(T);
         if (info != .Float and info != .Int) @compileError("invalid vector type: " ++ @typeName(T));
 
-        const len = vectorLen(@TypeOf(v));
+        const len = veclen(@TypeOf(v));
         var out: [len]T = undefined;
         inline for (0..len) |i| {
             out[i] = std.math.lossyCast(T, v[i]);
@@ -280,7 +280,7 @@ pub const mat = struct {
 
         const info = @typeInfo(T);
 
-        const w = vec.vectorLen(Child(T));
+        const w = vec.veclen(Child(T));
         const h = info.Array.len;
         if (w != h) @compileError("non square matrix are not supported");
 
@@ -356,7 +356,7 @@ pub const mat = struct {
         return out;
     }
 
-    pub fn add(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
+    pub fn add(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
         const T = @TypeOf(a);
         const size = matsize(T);
 
@@ -368,7 +368,7 @@ pub const mat = struct {
         return out;
     }
 
-    pub fn sub(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
+    pub fn sub(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
         const T = @TypeOf(a);
         const size = matsize(T);
 
@@ -402,6 +402,53 @@ pub const mat = struct {
         }
 
         return out;
+    }
+
+    pub fn mulVec(v: Vec4, m: Mat4) Vec4 {
+        const v0 = @shuffle(f32, v, undefined, Vec4i{ 0, 0, 0, 0 });
+        const v1 = @shuffle(f32, v, undefined, Vec4i{ 1, 1, 1, 1 });
+        const v2 = @shuffle(f32, v, undefined, Vec4i{ 2, 2, 2, 2 });
+        const v3 = @shuffle(f32, v, undefined, Vec4i{ 3, 3, 3, 3 });
+
+        const m0 = v0 * m[0];
+        const m1 = v1 * m[1];
+        const m2 = v2 * m[2];
+        const m3 = v3 * m[3];
+
+        const a0 = m0 + m1;
+        const a1 = m2 + m3;
+        const a2 = a0 + a1;
+
+        return a2;
+    }
+
+    pub fn mul(a: Mat4, b: Mat4) Mat4 {
+        var out: Mat4 = undefined;
+        inline for (0..4) |i| {
+            out[i] = mulVec(a[i], b);
+        }
+
+        return out;
+    }
+
+    pub inline fn scaling(s: Vec3) Mat4 {
+        var out = zero(Mat4);
+        out[0][0] = s[0];
+        out[1][1] = s[1];
+        out[2][2] = s[2];
+        out[3][3] = 1;
+        return out;
+    }
+
+    pub inline fn scalingUniform(s: f32) Mat4 {
+        return scaling(.{ s, s, s });
+    }
+
+    pub fn debugPrint(m: anytype) void {
+        const size = matsize(@TypeOf(m));
+        for (0..size) |i| {
+            std.log.debug("{any}", .{m[i]});
+        }
     }
 };
 
@@ -554,4 +601,30 @@ test "mat.add" {
     const c = mat.add(a, b);
 
     try testing.expectEqual(2, c[1][1]);
+}
+
+test "mat.mul" {
+    const a = Mat4{
+        .{ 3, 4, 8, 8 },
+        .{ 9, 1, 5, 2 },
+        .{ 8, 2, 8, 4 },
+        .{ 9, 6, 5, 2 },
+    };
+    const b = Mat4{
+        .{ 7, 9, 1, 3 },
+        .{ 8, 6, 2, 5 },
+        .{ 3, 9, 1, 3 },
+        .{ 0, 4, 2, 1 },
+    };
+    const out = mat.mul(a, b);
+
+    try testing.expectEqual(
+        Mat4{
+            .{ 77, 155, 35, 61 },
+            .{ 86, 140, 20, 49 },
+            .{ 96, 172, 28, 62 },
+            .{ 126, 170, 30, 74 },
+        },
+        out,
+    );
 }

@@ -2,16 +2,25 @@ const std = @import("std");
 const mksv = @import("mksv");
 const math = mksv.math;
 
-pub fn main() !u8 {
-    const f = math.Frustum.init(std.math.degreesToRadians(80), 16.0 / 9.0, 0.1, 10000, .{ 0, 0, 0 }, .{ 0, 0, 1 });
+pub fn main() !void {
+    const a = math.Mat4{
+        .{ 3, 4, 8, 8 },
+        .{ 9, 1, 5, 2 },
+        .{ 8, 2, 8, 4 },
+        .{ 9, 6, 5, 2 },
+    };
+    const b = math.Mat4{
+        .{ 7, 9, 1, 3 },
+        .{ 8, 6, 2, 5 },
+        .{ 3, 9, 1, 3 },
+        .{ 0, 4, 2, 1 },
+    };
+    // const vec = math.Vec4{ 0, 1, 1, 1 };
+    const out = math.mat.mul(a, b);
 
-    var args = try std.process.argsWithAllocator(std.heap.page_allocator);
-    if (args.next()) |_| {
-        if (f.isPointInside(.{ 0, 0, 38 })) {
-            return 1;
-        }
-        return 2;
-    }
-
-    return 0;
+    math.mat.debugPrint(a);
+    std.log.debug("", .{});
+    math.mat.debugPrint(b);
+    std.log.debug("", .{});
+    math.mat.debugPrint(out);
 }
