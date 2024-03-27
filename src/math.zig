@@ -1,8 +1,6 @@
 const std = @import("std");
 
 const assert = std.debug.assert;
-const testing = std.testing;
-const float_tolerance = 0.0001;
 
 const Child = std.meta.Child;
 
@@ -145,37 +143,50 @@ pub const vec = struct {
         return div(v, len);
     }
 
-    pub fn cross(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
-        checkType(@TypeOf(a));
-        if (veclen(@TypeOf(a)) != 3) @compileError("cross product is only defined for 3-element vectors");
+    pub fn cross(a: anytype, b: anytype) @TypeOf(a, b) {
+        const T = @TypeOf(a, b);
+        checkType(T);
+        if (veclen(T) != 3) @compileError("cross product is only defined for 3-element vectors");
 
-        const T = Child(@TypeOf(a));
+        const C = Child(T);
+
+        const x: T = a;
+        const y: T = b;
 
         // https://geometrian.com/programming/tutorials/cross-product/index.php
-        const tmp0 = @shuffle(T, a, undefined, Vec3i{ 1, 2, 0 });
-        const tmp1 = @shuffle(T, b, undefined, Vec3i{ 2, 0, 1 });
+        const tmp0 = @shuffle(C, x, undefined, Vec3i{ 1, 2, 0 });
+        const tmp1 = @shuffle(C, y, undefined, Vec3i{ 2, 0, 1 });
 
-        const tmp2 = tmp0 * b;
+        const tmp2 = tmp0 * y;
         const tmp3 = tmp0 * tmp1;
 
-        const tmp4 = @shuffle(T, tmp2, undefined, Vec3i{ 1, 2, 0 });
+        const tmp4 = @shuffle(C, tmp2, undefined, Vec3i{ 1, 2, 0 });
 
         return tmp3 - tmp4;
     }
 
-    pub fn distance2(a: anytype, b: @TypeOf(a)) Child(@TypeOf(a)) {
-        checkType(@TypeOf(a));
-        return length2(b - a);
+    pub fn distance2(a: anytype, b: anytype) Child(@TypeOf(a, b)) {
+        const T = @TypeOf(a, b);
+        checkType(T);
+
+        const x: T = a;
+        const y: T = b;
+
+        return length2(y - x);
     }
 
-    pub fn distance(a: anytype, b: @TypeOf(a)) Child(@TypeOf(a)) {
-        checkType(@TypeOf(a));
-        return @sqrt(length2(b - a));
+    pub fn distance(a: anytype, b: anytype) Child(@TypeOf(a, b)) {
+        return @sqrt(distance2(a, b));
     }
 
-    pub fn eql(a: anytype, b: @TypeOf(a)) bool {
-        checkType(@TypeOf(a));
-        return @reduce(.And, a == b);
+    pub fn eql(a: anytype, b: anytype) bool {
+        const T = @TypeOf(a, b);
+        checkType(T);
+
+        const x: T = a;
+        const y: T = b;
+
+        return @reduce(.And, x == y);
     }
 
     pub const Component = enum(usize) { x = 0, y = 1, z = 2, w = 3 };
@@ -356,25 +367,31 @@ pub const mat = struct {
         return out;
     }
 
-    pub fn add(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
-        const T = @TypeOf(a);
+    pub fn add(a: anytype, b: anytype) @TypeOf(a, b) {
+        const T = @TypeOf(a, b);
         const size = matsize(T);
+
+        const x: T = a;
+        const y: T = b;
 
         var out: T = undefined;
         inline for (0..size) |i| {
-            out[i] = a[i] + b[i];
+            out[i] = x[i] + y[i];
         }
 
         return out;
     }
 
-    pub fn sub(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
-        const T = @TypeOf(a);
+    pub fn sub(a: anytype, b: anytype) @TypeOf(a, b) {
+        const T = @TypeOf(a, b);
         const size = matsize(T);
+
+        const x: T = a;
+        const y: T = b;
 
         var out: T = undefined;
         inline for (0..size) |i| {
-            out[i] = a[i] - b[i];
+            out[i] = x[i] - y[i];
         }
 
         return out;
@@ -459,13 +476,16 @@ pub const mat = struct {
         }
     }
 
-    pub fn mul(a: anytype, b: @TypeOf(a)) @TypeOf(a, b) {
+    pub fn mul(a: anytype, b: anytype) @TypeOf(a, b) {
         const T = @TypeOf(a, b);
         const size = matsize(T);
 
+        const x: T = a;
+        const y: T = b;
+
         var out: T = undefined;
         inline for (0..size) |i| {
-            out[i] = mulVec(a[i], b);
+            out[i] = mulVec(x[i], y);
         }
 
         return out;
@@ -525,7 +545,7 @@ pub const mat = struct {
         return scaling(.{ s, s, s });
     }
 
-    pub fn scale(m: *const Mat4, s: Vec3) Mat4 {
+    pub fn scale(m: Mat4, s: Vec3) Mat4 {
         var out: Mat4 = undefined;
         out[0] = vec.mul(m[0], s[0]);
         out[1] = vec.mul(m[1], s[1]);
@@ -534,8 +554,116 @@ pub const mat = struct {
         return out;
     }
 
-    pub fn scaleScalar(m: *const Mat4, s: f32) Mat4 {
+    pub fn scaleScalar(m: Mat4, s: f32) Mat4 {
         return scale(m, .{ s, s, s });
+    }
+
+    pub fn translation(t: Vec3) Mat4 {
+        var out = identity(Mat4);
+        out[3] = vec.vec4(t);
+        return out;
+    }
+
+    pub fn translate(m: Mat4, t: Vec3) Mat4 {
+        var out = m;
+        const a = vec.mul(m[0], t[0]);
+        const b = vec.mul(m[1], t[1]);
+        const c = vec.mul(m[2], t[2]);
+        out[3] = (a + b) + (c + m[3]);
+        return out;
+    }
+
+    pub fn rotation(angle: f32, axis: Vec3) Mat4 {
+        const s = @sin(angle);
+        const c = @cos(angle);
+        const a = vec.normalize(axis);
+        const t = vec.mul(a, 1 - c);
+
+        var out = identity(Mat4);
+        out[0][0] = c + t[0] * a[0];
+        out[0][1] = t[0] * a[1] + s * a[2];
+        out[0][2] = t[0] * a[2] - s * a[1];
+        out[1][0] = t[1] * a[0] - s * a[2];
+        out[1][1] = c + t[1] * a[1];
+        out[1][2] = t[1] * a[2] + s * a[0];
+        out[2][0] = t[2] * a[0] + s * a[1];
+        out[2][1] = t[2] * a[1] - s * a[0];
+        out[2][2] = c + t[2] * a[2];
+        return out;
+    }
+
+    pub fn rotate(m: Mat4, angle: f32, axis: Vec3) Mat4 {
+        const rot = rotation(angle, axis);
+
+        var out: Mat4 = undefined;
+
+        const a = vec.mul(m[0], rot[0][0]);
+        const b = vec.mul(m[1], rot[0][1]);
+        const c = vec.mul(m[2], rot[0][2]);
+        out[0] = a + b + c;
+
+        const d = vec.mul(m[0], rot[1][0]);
+        const e = vec.mul(m[1], rot[1][1]);
+        const f = vec.mul(m[2], rot[1][2]);
+        out[1] = d + e + f;
+
+        const g = vec.mul(m[0], rot[2][0]);
+        const h = vec.mul(m[1], rot[2][1]);
+        const i = vec.mul(m[2], rot[2][2]);
+        out[2] = g + h + i;
+
+        out[3] = m[3];
+
+        return out;
+    }
+
+    pub fn orthographic(left: f32, right: f32, top: f32, bottom: f32, near: f32, far: f32) Mat4 {
+        var out = std.mem.zeroes(Mat4);
+        out[0][0] = 2 / (right - left);
+        out[1][1] = 2 / (bottom - top);
+        out[2][2] = 1 / (far - near);
+        out[3][0] = -(right + left) / (right - left);
+        out[3][1] = -(bottom + top) / (bottom - top);
+        out[3][2] = -near / (far - near);
+        return out;
+    }
+
+    pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) Mat4 {
+        std.debug.assert(near > 0 and far > 0);
+
+        const g = 1.0 / @tan(fovy / 2.0);
+        const k = far / (far - near);
+
+        var out = std.mem.zeroes(Mat4);
+        out[0][0] = g / aspect;
+        out[1][1] = -g;
+        out[2][2] = -k;
+        out[2][3] = -1;
+        out[3][2] = -near * k;
+        return out;
+    }
+
+    pub fn lookAtDir(eye: Vec3, dir: Vec3, up: Vec3) Mat4 {
+        std.debug.assert(vec.length2(dir) != 0);
+
+        const w = vec.normalize(dir);
+        const u = vec.normalize(vec.cross(w, up));
+        const v = vec.cross(u, w);
+
+        const dot_u = vec.dot(u, eye);
+        const dot_v = vec.dot(v, eye);
+        const dot_w = vec.dot(w, eye);
+
+        return .{
+            .{ u[0], v[0], -w[0], 0 },
+            .{ u[1], v[1], -w[1], 0 },
+            .{ u[2], v[2], -w[2], 0 },
+            .{ -dot_u, -dot_v, dot_w, 1 },
+        };
+    }
+
+    pub fn lookAt(eye: Vec3, target: Vec3, up: Vec3) Mat4 {
+        return lookAtDir(eye, vec.sub(target, eye), up);
     }
 
     pub fn debugPrint(m: anytype) void {
@@ -554,6 +682,9 @@ fn checkNormalized(v: anytype) void {
     const len = vec.length(v);
     assert(std.math.approxEqRel(f32, len, 1, float_tolerance));
 }
+
+const testing = std.testing;
+const float_tolerance = 0.0001;
 
 test "vec.zero" {
     const x = vec.zero(Vec4);
@@ -810,4 +941,55 @@ test "mat.transpose" {
         },
         v,
     );
+}
+
+test "mat.translate" {
+    var m = mat.identity(Mat4);
+    m = mat.translate(m, .{ 1, 2, 3 });
+
+    const pos = Vec4{ 0, 0, 0, 1 };
+    const out = mat.mulVec(pos, m);
+
+    try testing.expectEqual(.{ 1, 2, 3, 1 }, out);
+
+    const t = mat.translation(.{ 1, 2, 3 });
+    const p = mat.mulVec(Vec4{ 0, 0, 0, 1 }, t);
+    try testing.expectEqual(.{ 1, 2, 3, 1 }, p);
+}
+
+test "mat.rotate" {
+    const pos = Vec4{ 1, 1, 1, 1 };
+
+    var m = mat.identity(Mat4);
+    m = mat.rotate(m, std.math.degreesToRadians(180), .{ 1, 0, 0 });
+
+    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[0], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[1], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[2], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[3], float_tolerance);
+
+    m = mat.identity(Mat4);
+    m = mat.rotate(m, std.math.degreesToRadians(180), .{ 0, 1, 0 });
+
+    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[0], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[1], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[2], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[3], float_tolerance);
+
+    m = mat.identity(Mat4);
+    m = mat.rotate(m, std.math.degreesToRadians(180), .{ 0, 0, 1 });
+
+    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[0], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[1], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[2], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[3], float_tolerance);
+}
+
+test "mat.scale" {
+    const pos = Vec4{ 1, 1, 1, 1 };
+
+    var m = mat.identity(Mat4);
+    m = mat.scale(m, .{ 2, 3, 4 });
+
+    try testing.expectEqual(.{ 2, 3, 4, 1 }, mat.mulVec(pos, m));
 }
