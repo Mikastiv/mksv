@@ -3,17 +3,12 @@ const mksv = @import("mksv");
 const math = mksv.math;
 
 pub fn main() !void {
-    var args = try std.process.argsWithAllocator(std.heap.page_allocator);
-    var i: i32 = 0;
-    while (args.next()) |_| : (i += 1) {}
-    const a = math.Mat2i{
-        .{ 3, i },
-        .{ 9, 1 },
+    const a = math.Mat4i{
+        .{ 1, 2, 3, 4 },
+        .{ 5, 6, 7, 8 },
+        .{ 9, 10, 11, 12 },
+        .{ 13, 14, 15, 16 },
     };
-    const b = math.Mat2i{
-        .{ 7, 9 },
-        .{ i, 6 },
-    };
-    const out = math.mat.mul(a, b);
+    const out = math.mat.transpose(a);
     math.mat.debugPrint(out);
 }

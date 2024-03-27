@@ -471,7 +471,48 @@ pub const mat = struct {
         return out;
     }
 
-    pub inline fn scaling(s: Vec3) Mat4 {
+    pub fn transpose(m: anytype) @TypeOf(m) {
+        const T = @TypeOf(m);
+        const size = matsize(T);
+
+        const C = Child(Child(T));
+        switch (size) {
+            2 => {
+                const m0 = @shuffle(C, m[0], m[1], Vec2i{ 0, -1 });
+                const m1 = @shuffle(C, m[0], m[1], Vec2i{ 1, -2 });
+
+                return .{ m0, m1 };
+            },
+            3 => {
+                const t0 = @shuffle(C, m[0], m[1], Vec4i{ 0, -1, 1, -2 });
+                const t2 = @shuffle(C, m[2], undefined, Vec4i{ 0, 0, 1, 1 });
+                const t1 = @shuffle(C, m[0], m[1], Vec4i{ 2, -3, 0, 0 });
+                const t3 = @shuffle(C, m[2], undefined, Vec4i{ 2, 2, 0, 0 });
+
+                const m0 = @shuffle(C, t0, t2, Vec3i{ 0, 1, -1 });
+                const m1 = @shuffle(C, t2, t0, Vec3i{ -3, -4, 2 });
+                const m2 = @shuffle(C, t1, t3, Vec3i{ 0, 1, -1 });
+
+                return .{ m0, m1, m2 };
+            },
+            4 => {
+                const t0 = @shuffle(C, m[0], m[1], Vec4i{ 0, -1, 1, -2 });
+                const t2 = @shuffle(C, m[2], m[3], Vec4i{ 0, -1, 1, -2 });
+                const t1 = @shuffle(C, m[0], m[1], Vec4i{ 2, -3, 3, -4 });
+                const t3 = @shuffle(C, m[2], m[3], Vec4i{ 2, -3, 3, -4 });
+
+                const m0 = @shuffle(C, t0, t2, Vec4i{ 0, 1, -1, -2 });
+                const m1 = @shuffle(C, t2, t0, Vec4i{ -3, -4, 2, 3 });
+                const m2 = @shuffle(C, t1, t3, Vec4i{ 0, 1, -1, -2 });
+                const m3 = @shuffle(C, t3, t1, Vec4i{ -3, -4, 2, 3 });
+
+                return .{ m0, m1, m2, m3 };
+            },
+            else => @compileError("vector and matrix dimensions not supported"),
+        }
+    }
+
+    pub fn scaling(s: Vec3) Mat4 {
         var out = zero(Mat4);
         out[0][0] = s[0];
         out[1][1] = s[1];
@@ -480,8 +521,21 @@ pub const mat = struct {
         return out;
     }
 
-    pub inline fn scalingUniform(s: f32) Mat4 {
+    pub fn scalingUniform(s: f32) Mat4 {
         return scaling(.{ s, s, s });
+    }
+
+    pub fn scale(m: *const Mat4, s: Vec3) Mat4 {
+        var out: Mat4 = undefined;
+        out[0] = vec.mul(m[0], s[0]);
+        out[1] = vec.mul(m[1], s[1]);
+        out[2] = vec.mul(m[2], s[2]);
+        out[3] = m[3];
+        return out;
+    }
+
+    pub fn scaleScalar(m: *const Mat4, s: f32) Mat4 {
+        return scale(m, .{ s, s, s });
     }
 
     pub fn debugPrint(m: anytype) void {
@@ -703,6 +757,56 @@ test "mat.mul" {
         Mat2i{
             .{ 53, 51 },
             .{ 71, 87 },
+        },
+        v,
+    );
+}
+
+test "mat.transpose" {
+    const a = Mat4i{
+        .{ 1, 2, 3, 4 },
+        .{ 5, 6, 7, 8 },
+        .{ 9, 10, 11, 12 },
+        .{ 13, 14, 15, 16 },
+    };
+    const b = mat.transpose(a);
+
+    try testing.expectEqual(
+        Mat4i{
+            .{ 1, 5, 9, 13 },
+            .{ 2, 6, 10, 14 },
+            .{ 3, 7, 11, 15 },
+            .{ 4, 8, 12, 16 },
+        },
+        b,
+    );
+
+    const x = Mat3i{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+        .{ 7, 8, 9 },
+    };
+    const y = mat.transpose(x);
+
+    try testing.expectEqual(
+        Mat3i{
+            .{ 1, 4, 7 },
+            .{ 2, 5, 8 },
+            .{ 3, 6, 9 },
+        },
+        y,
+    );
+
+    const u = Mat2i{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    };
+    const v = mat.transpose(u);
+
+    try testing.expectEqual(
+        Mat2i{
+            .{ 1, 3 },
+            .{ 2, 4 },
         },
         v,
     );
