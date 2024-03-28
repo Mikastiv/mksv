@@ -25,10 +25,11 @@ pub fn main() !void {
 
     printMask(makeMask(0, 1, 1, 2));
 
-    const c = math.Mat3{
-        .{ 6, 1, 1 },
-        .{ 4, -2, 5 },
-        .{ 2, 8, 7 },
+    const c = math.Mat4{
+        .{ 2, 1, 9, 3 },
+        .{ 8, 9, 2, 1 },
+        .{ 6, 4, 2, 9 },
+        .{ 7, 0, 1, 3 },
     };
     std.debug.print("{d}\n", .{math.mat.determinant(c)});
 
@@ -38,10 +39,11 @@ pub fn main() !void {
 
     var sum: u64 = 0;
     for (0..100000000) |_| {
-        const b = math.Mat3{
-            .{ rng.float(f32), rng.float(f32), rng.float(f32) },
-            .{ rng.float(f32), rng.float(f32), rng.float(f32) },
-            .{ rng.float(f32), rng.float(f32), rng.float(f32) },
+        const b = math.Mat4{
+            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
+            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
+            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
+            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
         };
         const s = try std.time.Instant.now();
         const det = math.mat.determinant(b);
