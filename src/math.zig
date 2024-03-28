@@ -672,37 +672,15 @@ pub const mat = struct {
                 //  d = trace(AB*DC) = trace(A#*B*D#*C)
                 var x = @shuffle(C, dc, undefined, Vec4i{ 0, 2, 1, 3 }) * ab;
 
-                const mask4 = Vec4i{ 0, 0, 2, 2 };
-                const mask5 = Vec4i{ 1, 1, 3, 3 };
-
-                //  iD = C*A#*B
-                var id = @shuffle(C, c, undefined, mask4) * @shuffle(C, ab, undefined, mask.movelh_1);
-                id = id + @shuffle(C, c, undefined, mask5) * @shuffle(C, ab, undefined, mask.movehl_1);
-
-                //  iA = B*D#*C
-                var ia = @shuffle(C, b, undefined, mask4) * @shuffle(C, dc, undefined, mask.movelh_1);
-                ia = ia + @shuffle(C, b, undefined, mask5) * @shuffle(C, dc, undefined, mask.movehl_1);
-
                 //  d = trace(AB*DC) = trace(A#*B*D#*C) [continue]
                 x = x + @shuffle(C, x, undefined, mask.movehl_1);
                 x[0] += x[1];
 
-                var d1 = det_a;
-                d1[0] *= det_d[0];
-
-                var d2 = det_b;
-                d2[0] *= det_c[0];
-
-                //  iD = D*|A| - C*A#*B
-                id = @shuffle(C, det_a, undefined, Vec4i{ 0, 0, 0, 0 }) * d - id;
-
-                //  iA = A*|D| - B*D#*C;
-                ia = @shuffle(C, det_d, undefined, Vec4i{ 0, 0, 0, 0 }) * a - ia;
+                const d1 = det_a * det_d;
+                const d2 = det_b * det_c;
 
                 //  det = |A|*|D| + |B|*|C| - trace(A#*B*D#*C)
-                var det = d1;
-                det[0] += d2[0];
-                det[0] -= x[0];
+                const det = d1 + d2 - x;
 
                 return det[0];
 
