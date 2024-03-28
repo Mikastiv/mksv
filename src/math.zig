@@ -633,6 +633,36 @@ pub const mat = struct {
         const C = Child(Child(T));
 
         switch (size) {
+            2 => {
+                const t0 = @shuffle(C, m[1], undefined, Vec2i{ 1, 0 });
+                const x = m[0] * t0;
+
+                return x[0] - x[1];
+            },
+            3 => {
+                const Mat2x2 = [2]@Vector(2, C);
+                const a = Mat2x2{
+                    @shuffle(C, m[1], undefined, Vec2i{ 1, 2 }),
+                    @shuffle(C, m[2], undefined, Vec2i{ 1, 2 }),
+                };
+                const b = Mat2x2{
+                    @shuffle(C, m[1], undefined, Vec2i{ 0, 2 }),
+                    @shuffle(C, m[2], undefined, Vec2i{ 0, 2 }),
+                };
+                const c = Mat2x2{
+                    @shuffle(C, m[1], undefined, Vec2i{ 0, 1 }),
+                    @shuffle(C, m[2], undefined, Vec2i{ 0, 1 }),
+                };
+
+                const det_a = mat.determinant(a);
+                const det_b = mat.determinant(b);
+                const det_c = mat.determinant(c);
+
+                const x = Child(T){ det_a, det_b, det_c };
+                const y = m[0] * x;
+
+                return y[0] - y[1] + y[2];
+            },
             4 => {
                 // https://github.com/cryos/eigen/blob/master/Eigen/src/LU/arch/Inverse_SSE.h
                 const a = @shuffle(C, m[0], m[1], mask.movelh);
@@ -1105,13 +1135,27 @@ test "mat.scale" {
 }
 
 test "mat.determinant" {
-    const m = Mat4{
+    const a = Mat4{
         .{ 2, 1, 9, 3 },
         .{ 8, 9, 2, 1 },
         .{ 6, 4, 2, 9 },
         .{ 7, 0, 1, 3 },
     };
 
-    const det = mat.determinant(m);
-    try testing.expectApproxEqRel(3961, det, float_tolerance);
+    try testing.expectApproxEqRel(3961, mat.determinant(a), float_tolerance);
+
+    const b = Mat2{
+        .{ 4, 6 },
+        .{ 3, 8 },
+    };
+
+    try testing.expectApproxEqRel(14, mat.determinant(b), float_tolerance);
+
+    const c = Mat3{
+        .{ 6, 1, 1 },
+        .{ 4, -2, 5 },
+        .{ 2, 8, 7 },
+    };
+
+    try testing.expectApproxEqRel(-306, mat.determinant(c), float_tolerance);
 }

@@ -24,4 +24,10 @@ pub fn main() !void {
     printMask(0xDD);
 
     printMask(makeMask(0, 1, 1, 2));
+
+    const b = math.Mat2{
+        .{ 4, 6 },
+        .{ 3, 8 },
+    };
+    std.debug.print("{d}\n", .{math.mat.determinant(b)});
 }
