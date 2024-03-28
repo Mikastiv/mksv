@@ -25,9 +25,31 @@ pub fn main() !void {
 
     printMask(makeMask(0, 1, 1, 2));
 
-    const b = math.Mat2{
-        .{ 4, 6 },
-        .{ 3, 8 },
+    const c = math.Mat3{
+        .{ 6, 1, 1 },
+        .{ 4, -2, 5 },
+        .{ 2, 8, 7 },
     };
-    std.debug.print("{d}\n", .{math.mat.determinant(b)});
+    std.debug.print("{d}\n", .{math.mat.determinant(c)});
+
+    const n = try std.time.Instant.now();
+    var r = std.Random.DefaultPrng.init(n.timestamp);
+    const rng = r.random();
+
+    var sum: u64 = 0;
+    for (0..100000000) |_| {
+        const b = math.Mat3{
+            .{ rng.float(f32), rng.float(f32), rng.float(f32) },
+            .{ rng.float(f32), rng.float(f32), rng.float(f32) },
+            .{ rng.float(f32), rng.float(f32), rng.float(f32) },
+        };
+        const s = try std.time.Instant.now();
+        const det = math.mat.determinant(b);
+        std.mem.doNotOptimizeAway(det);
+        const end = try std.time.Instant.now();
+
+        sum += end.timestamp - s.timestamp;
+    }
+
+    std.debug.print("{d}\n", .{sum});
 }

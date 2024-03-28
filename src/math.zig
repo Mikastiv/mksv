@@ -634,34 +634,13 @@ pub const mat = struct {
 
         switch (size) {
             2 => {
-                const t0 = @shuffle(C, m[1], undefined, Vec2i{ 1, 0 });
-                const x = m[0] * t0;
-
-                return x[0] - x[1];
+                return (m[0][0] * m[1][1]) - (m[1][0] * m[0][1]);
             },
             3 => {
-                const Mat2x2 = [2]@Vector(2, C);
-                const a = Mat2x2{
-                    @shuffle(C, m[1], undefined, Vec2i{ 1, 2 }),
-                    @shuffle(C, m[2], undefined, Vec2i{ 1, 2 }),
-                };
-                const b = Mat2x2{
-                    @shuffle(C, m[1], undefined, Vec2i{ 0, 2 }),
-                    @shuffle(C, m[2], undefined, Vec2i{ 0, 2 }),
-                };
-                const c = Mat2x2{
-                    @shuffle(C, m[1], undefined, Vec2i{ 0, 1 }),
-                    @shuffle(C, m[2], undefined, Vec2i{ 0, 1 }),
-                };
-
-                const det_a = mat.determinant(a);
-                const det_b = mat.determinant(b);
-                const det_c = mat.determinant(c);
-
-                const x = Child(T){ det_a, det_b, det_c };
-                const y = m[0] * x;
-
-                return y[0] - y[1] + y[2];
+                const a = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]);
+                const b = m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]);
+                const c = m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+                return a - b + c;
             },
             4 => {
                 // https://github.com/cryos/eigen/blob/master/Eigen/src/LU/arch/Inverse_SSE.h
