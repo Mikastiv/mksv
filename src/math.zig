@@ -23,6 +23,14 @@ pub const Mat2 = [2]Vec2;
 pub const Mat3 = [3]Vec3;
 pub const Mat4 = [4]Vec4;
 
+const mask = struct {
+    const movelh = Vec4i{ 0, 1, -1, -2 };
+    const movehl = Vec4i{ -3, -4, 2, 3 };
+
+    const movelh_1 = Vec4i{ 0, 1, 0, 1 };
+    const movehl_1 = Vec4i{ 2, 3, 2, 3 };
+};
+
 pub const Plane = struct {
     data: Vec4,
 
@@ -197,8 +205,8 @@ pub const vec = struct {
         comptime c1: Component,
     ) @Vector(2, Child(@TypeOf(v))) {
         checkType(@TypeOf(v));
-        const mask = Vec2i{ @intFromEnum(c0), @intFromEnum(c1) };
-        return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
+        const m = Vec2i{ @intFromEnum(c0), @intFromEnum(c1) };
+        return @shuffle(Child(@TypeOf(v)), v, undefined, m);
     }
 
     pub fn swizzle3(
@@ -208,8 +216,8 @@ pub const vec = struct {
         comptime c2: Component,
     ) @Vector(3, Child(@TypeOf(v))) {
         checkType(@TypeOf(v));
-        const mask = Vec3i{ @intFromEnum(c0), @intFromEnum(c1), @intFromEnum(c2) };
-        return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
+        const m = Vec3i{ @intFromEnum(c0), @intFromEnum(c1), @intFromEnum(c2) };
+        return @shuffle(Child(@TypeOf(v)), v, undefined, m);
     }
 
     pub fn swizzle4(
@@ -220,8 +228,8 @@ pub const vec = struct {
         comptime c3: Component,
     ) @Vector(4, Child(@TypeOf(v))) {
         checkType(@TypeOf(v));
-        const mask = Vec4i{ @intFromEnum(c0), @intFromEnum(c1), @intFromEnum(c2), @intFromEnum(c3) };
-        return @shuffle(Child(@TypeOf(v)), v, undefined, mask);
+        const m = Vec4i{ @intFromEnum(c0), @intFromEnum(c1), @intFromEnum(c2), @intFromEnum(c3) };
+        return @shuffle(Child(@TypeOf(v)), v, undefined, m);
     }
 
     pub fn vec2(v: anytype) @Vector(2, Child(@TypeOf(v))) {
@@ -434,7 +442,7 @@ pub const mat = struct {
         switch (size) {
             2 => {
                 const v0 = @shuffle(T, v, undefined, Vec4i{ 0, 0, 1, 1 });
-                const m0 = @shuffle(T, m[0], m[1], Vec4i{ 0, 1, -1, -2 });
+                const m0 = @shuffle(T, m[0], m[1], mask.movelh);
 
                 const a0 = v0 * m0;
 
@@ -504,27 +512,27 @@ pub const mat = struct {
                 return .{ m0, m1 };
             },
             3 => {
-                const t0 = @shuffle(C, m[0], m[1], Vec4i{ 0, -1, 1, -2 });
-                const t2 = @shuffle(C, m[2], undefined, Vec4i{ 0, 0, 1, 1 });
-                const t1 = @shuffle(C, m[0], m[1], Vec4i{ 2, -3, 0, 0 });
-                const t3 = @shuffle(C, m[2], undefined, Vec4i{ 2, 2, 0, 0 });
+                const t0 = @shuffle(C, m[0], m[1], Vec4i{ 0, 1, -1, -2 });
+                const t2 = @shuffle(C, m[0], m[1], Vec4i{ 2, 2, -3, -3 });
+                const t1 = @shuffle(C, m[2], undefined, Vec4i{ 0, 1, -1, -2 });
+                const t3 = @shuffle(C, m[2], undefined, Vec4i{ 2, 2, -3, -3 });
 
-                const m0 = @shuffle(C, t0, t2, Vec3i{ 0, 1, -1 });
-                const m1 = @shuffle(C, t2, t0, Vec3i{ -3, -4, 2 });
-                const m2 = @shuffle(C, t1, t3, Vec3i{ 0, 1, -1 });
+                const m0 = @shuffle(C, t0, t1, Vec3i{ 0, 2, -1 });
+                const m1 = @shuffle(C, t0, t1, Vec3i{ 1, 3, -2 });
+                const m2 = @shuffle(C, t2, t3, Vec3i{ 0, 2, -1 });
 
                 return .{ m0, m1, m2 };
             },
             4 => {
-                const t0 = @shuffle(C, m[0], m[1], Vec4i{ 0, -1, 1, -2 });
-                const t2 = @shuffle(C, m[2], m[3], Vec4i{ 0, -1, 1, -2 });
-                const t1 = @shuffle(C, m[0], m[1], Vec4i{ 2, -3, 3, -4 });
-                const t3 = @shuffle(C, m[2], m[3], Vec4i{ 2, -3, 3, -4 });
+                const t0 = @shuffle(C, m[0], m[1], Vec4i{ 0, 1, -1, -2 });
+                const t2 = @shuffle(C, m[0], m[1], Vec4i{ 2, 3, -3, -4 });
+                const t1 = @shuffle(C, m[2], m[3], Vec4i{ 0, 1, -1, -2 });
+                const t3 = @shuffle(C, m[2], m[3], Vec4i{ 2, 3, -3, -4 });
 
-                const m0 = @shuffle(C, t0, t2, Vec4i{ 0, 1, -1, -2 });
-                const m1 = @shuffle(C, t2, t0, Vec4i{ -3, -4, 2, 3 });
-                const m2 = @shuffle(C, t1, t3, Vec4i{ 0, 1, -1, -2 });
-                const m3 = @shuffle(C, t3, t1, Vec4i{ -3, -4, 2, 3 });
+                const m0 = @shuffle(C, t0, t1, Vec4i{ 0, 2, -1, -3 });
+                const m1 = @shuffle(C, t0, t1, Vec4i{ 1, 3, -2, -4 });
+                const m2 = @shuffle(C, t2, t3, Vec4i{ 0, 2, -1, -3 });
+                const m3 = @shuffle(C, t2, t3, Vec4i{ 1, 3, -2, -4 });
 
                 return .{ m0, m1, m2, m3 };
             },
@@ -579,7 +587,7 @@ pub const mat = struct {
         const a = vec.normalize(axis);
         const t = vec.mul(a, 1 - c);
 
-        var out = identity(Mat4);
+        var out = zero(Mat4);
         out[0][0] = c + t[0] * a[0];
         out[0][1] = t[0] * a[1] + s * a[2];
         out[0][2] = t[0] * a[2] - s * a[1];
@@ -589,6 +597,7 @@ pub const mat = struct {
         out[2][0] = t[2] * a[0] + s * a[1];
         out[2][1] = t[2] * a[1] - s * a[0];
         out[2][2] = c + t[2] * a[2];
+        out[3][3] = 1;
         return out;
     }
 
@@ -617,8 +626,131 @@ pub const mat = struct {
         return out;
     }
 
+    pub fn determinant(m: anytype) Child(Child(@TypeOf(m))) {
+        const T = @TypeOf(m);
+        const size = matsize(T);
+
+        const C = Child(Child(T));
+
+        switch (size) {
+            4 => {
+                // https://github.com/cryos/eigen/blob/master/Eigen/src/LU/arch/Inverse_SSE.h
+                const a = @shuffle(C, m[0], m[1], mask.movelh);
+                const b = @shuffle(C, m[1], m[0], mask.movehl);
+                const c = @shuffle(C, m[2], m[3], mask.movelh);
+                const d = @shuffle(C, m[3], m[2], mask.movehl);
+
+                const mask0 = Vec4i{ 3, 3, 0, 0 };
+                const mask1 = Vec4i{ 1, 1, 2, 2 };
+                const mask2 = Vec4i{ 2, 3, 0, 1 };
+
+                //  AB = A# * B
+                var ab = @shuffle(C, a, undefined, mask0) * b;
+                ab = ab - @shuffle(C, a, undefined, mask1) * @shuffle(C, b, undefined, mask2);
+                //  DC = D# * C
+                var dc = @shuffle(C, d, undefined, mask0) * c;
+                dc = dc - @shuffle(C, d, undefined, mask1) * @shuffle(C, c, undefined, mask2);
+
+                const mask3 = Vec4i{ 3, 3, 1, 1 };
+
+                //  dA = |A|
+                var det_a = @shuffle(C, a, undefined, mask3) * a;
+                det_a[0] -= det_a[2];
+
+                //  dB = |B|
+                var det_b = @shuffle(C, b, undefined, mask3) * b;
+                det_b[0] -= det_b[2];
+
+                //  dC = |C|
+                var det_c = @shuffle(C, c, undefined, mask3) * c;
+                det_c[0] -= det_c[2];
+
+                //  dD = |D|
+                var det_d = @shuffle(C, d, undefined, mask3) * d;
+                det_d[0] -= det_d[2];
+
+                //  d = trace(AB*DC) = trace(A#*B*D#*C)
+                var x = @shuffle(C, dc, undefined, Vec4i{ 0, 2, 1, 3 }) * ab;
+
+                const mask4 = Vec4i{ 0, 0, 2, 2 };
+                const mask5 = Vec4i{ 1, 1, 3, 3 };
+
+                //  iD = C*A#*B
+                var id = @shuffle(C, c, undefined, mask4) * @shuffle(C, ab, undefined, mask.movelh_1);
+                id = id + @shuffle(C, c, undefined, mask5) * @shuffle(C, ab, undefined, mask.movehl_1);
+
+                //  iA = B*D#*C
+                var ia = @shuffle(C, b, undefined, mask4) * @shuffle(C, dc, undefined, mask.movelh_1);
+                ia = ia + @shuffle(C, b, undefined, mask5) * @shuffle(C, dc, undefined, mask.movehl_1);
+
+                //  d = trace(AB*DC) = trace(A#*B*D#*C) [continue]
+                x = x + @shuffle(C, x, undefined, mask.movehl_1);
+                x[0] += x[1];
+
+                var d1 = det_a;
+                d1[0] *= det_d[0];
+
+                var d2 = det_b;
+                d2[0] *= det_c[0];
+
+                //  iD = D*|A| - C*A#*B
+                id = @shuffle(C, det_a, undefined, Vec4i{ 0, 0, 0, 0 }) * d - id;
+
+                //  iA = A*|D| - B*D#*C;
+                ia = @shuffle(C, det_d, undefined, Vec4i{ 0, 0, 0, 0 }) * a - ia;
+
+                //  det = |A|*|D| + |B|*|C| - trace(A#*B*D#*C)
+                var det = d1;
+                det[0] += d2[0];
+                det[0] -= x[0];
+
+                return det[0];
+
+                //  https://github.com/g-truc/glm/blob/master/glm/simd/matrix.h
+                // const a = @shuffle(C, m[2], undefined, Vec4i{ 0, 1, 1, 2 });
+                // const b = @shuffle(C, m[3], undefined, Vec4i{ 3, 2, 3, 3 });
+                // const c = a * b;
+
+                // const d = @shuffle(C, m[2], undefined, Vec4i{ 3, 2, 3, 3 });
+                // const e = @shuffle(C, m[3], undefined, Vec4i{ 0, 1, 1, 2 });
+                // const f = d * e;
+
+                // const sub_e = c - f;
+
+                // const g = @shuffle(C, m[2], undefined, Vec4i{ 0, 0, 1, 2 });
+                // const h = @shuffle(C, m[3], undefined, Vec4i{ 1, 2, 0, 0 });
+                // const i = g * h;
+
+                // const sub_f = @shuffle(C, i, undefined, mask.movehl_1) - i;
+
+                // var t0 = @shuffle(C, sub_e, undefined, Vec4i{ 2, 1, 0, 0 });
+                // var t1 = @shuffle(C, m[1], undefined, Vec4i{ 0, 0, 0, 1 });
+                // const x = t0 * t1;
+
+                // t0 = @shuffle(C, sub_e, sub_f, Vec4i{ 0, 0, -4, -2 });
+                // t0 = @shuffle(C, t0, undefined, Vec4i{ 3, 1, 1, 0 });
+                // t1 = @shuffle(C, m[1], undefined, Vec4i{ 1, 1, 2, 2 });
+                // const y = t0 * t1;
+
+                // const sub_res = x - y;
+
+                // t0 = @shuffle(C, sub_e, sub_f, Vec4i{ 1, 0, -3, -3 });
+                // t0 = @shuffle(C, t0, undefined, Vec4i{ 3, 3, 2, 0 });
+                // t1 = @shuffle(C, m[1], undefined, Vec4i{ 2, 3, 3, 3 });
+                // const z = t0 * t1;
+
+                // const add_res = sub_res + z;
+                // const v = @TypeOf(add_res){ 1, -1, 1, -1 };
+                // const det_cof = add_res * v;
+
+                // return vec.dot(m[0], det_cof);
+            },
+            else => unsupportedType(@TypeOf(m)),
+        }
+    }
+
     pub fn orthographic(left: f32, right: f32, top: f32, bottom: f32, near: f32, far: f32) Mat4 {
-        var out = std.mem.zeroes(Mat4);
+        var out = zero(Mat4);
         out[0][0] = 2 / (right - left);
         out[1][1] = 2 / (bottom - top);
         out[2][2] = 1 / (far - near);
@@ -634,7 +766,7 @@ pub const mat = struct {
         const g = 1.0 / @tan(fovy / 2.0);
         const k = far / (far - near);
 
-        var out = std.mem.zeroes(Mat4);
+        var out = zero(Mat4);
         out[0][0] = g / aspect;
         out[1][1] = -g;
         out[2][2] = -k;
@@ -992,4 +1124,16 @@ test "mat.scale" {
     m = mat.scale(m, .{ 2, 3, 4 });
 
     try testing.expectEqual(.{ 2, 3, 4, 1 }, mat.mulVec(pos, m));
+}
+
+test "mat.determinant" {
+    const m = Mat4{
+        .{ 2, 1, 9, 3 },
+        .{ 8, 9, 2, 1 },
+        .{ 6, 4, 2, 9 },
+        .{ 7, 0, 1, 3 },
+    };
+
+    const det = mat.determinant(m);
+    try testing.expectApproxEqRel(3961, det, float_tolerance);
 }
