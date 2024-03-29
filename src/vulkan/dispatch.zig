@@ -100,7 +100,6 @@ else
         .createSwapchainKHR = true,
         .destroySwapchainKHR = true,
         .getSwapchainImagesKHR = true,
-        .getPhysicalDeviceMemoryProperties = true,
         .getBufferMemoryRequirements = true,
         .getImageMemoryRequirements = true,
         .createImage = true,

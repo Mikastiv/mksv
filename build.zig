@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "build_options", .module = build_options.createModule() },
             .{ .name = "vulkan-zig", .module = vkzig_dep.module("vulkan-zig") },
         },
     });
