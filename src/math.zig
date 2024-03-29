@@ -32,7 +32,7 @@ const mask = struct {
 };
 
 pub const Plane = struct {
-    data: Vec4,
+    data: Vec4, // nx, ny, nx, d
 
     pub fn init(p: Vec3, n: Vec3) Plane {
         const x = vec.normalize(n);
@@ -864,6 +864,129 @@ fn checkNormalized(v: anytype) void {
     assert(std.math.approxEqRel(f32, len, 1, float_tolerance));
 }
 
+pub const Sphere = struct {
+    data: Vec4, // x, y, z, radius
+
+    pub fn init(c: Vec3, r: f32) Sphere {
+        return .{ .data = .{ c[0], c[1], c[2], r } };
+    }
+
+    pub fn contains(self: Sphere, point: Vec3) bool {
+        return vec.distance(self.center(), point) <= self.radius() + float_tolerance;
+    }
+
+    pub fn center(self: Sphere) Vec3 {
+        return vec.swizzle3(self.data, .x, .y, .z);
+    }
+
+    pub fn radius(self: Sphere) f32 {
+        return self.data[3];
+    }
+
+    pub fn circumsphere(a: Vec3, b: Vec3, c: Vec3, d: Vec3) Sphere {
+        const a2 = vec.length2(a);
+        const b2 = vec.length2(b);
+        const c2 = vec.length2(c);
+        const d2 = vec.length2(d);
+
+        const detInv = 1.0 / mat.determinant(Mat4{
+            .{ a[0], a[1], a[2], 1 },
+            .{ b[0], b[1], b[2], 1 },
+            .{ c[0], c[1], c[2], 1 },
+            .{ d[0], d[1], d[2], 1 },
+        });
+
+        const x = mat.determinant(Mat4{
+            .{ a2, a[1], a[2], 1 },
+            .{ b2, b[1], b[2], 1 },
+            .{ c2, c[1], c[2], 1 },
+            .{ d2, d[1], d[2], 1 },
+        });
+        const y = mat.determinant(Mat4{
+            .{ a[0], a2, a[2], 1 },
+            .{ b[0], b2, b[2], 1 },
+            .{ c[0], c2, c[2], 1 },
+            .{ d[0], d2, d[2], 1 },
+        });
+        const z = mat.determinant(Mat4{
+            .{ a[0], a[1], a2, 1 },
+            .{ b[0], b[1], b2, 1 },
+            .{ c[0], c[1], c2, 1 },
+            .{ d[0], d[1], d2, 1 },
+        });
+
+        const cen = vec.mul(Vec3{ x, y, z }, detInv * 0.5);
+
+        return init(cen, vec.distance(cen, a));
+    }
+
+    pub fn circumsphereTriangle(a: Vec3, b: Vec3, c: Vec3) Sphere {
+        const ca = c - a;
+        const ba = b - a;
+        const crs = vec.cross(ba, ca);
+
+        const t0 = vec.mul(vec.cross(crs, ba), vec.length2(ca));
+        const t1 = vec.mul(vec.cross(ca, crs), vec.length2(ba));
+        const x = t0 + t1;
+
+        const rvec = vec.div(x, 2.0 * vec.length2(crs));
+
+        return init(a + rvec, vec.length(rvec));
+    }
+
+    pub fn fromDiameter(a: Vec3, b: Vec3) Sphere {
+        const cen = vec.mul(a + b, 0.5);
+        return init(cen, vec.distance(cen, a));
+    }
+};
+
+fn smallestEnclosingSphereImpl(points: []const Vec3, end: usize, pin1: ?Vec3, pin2: ?Vec3, pin3: ?Vec3) Sphere {
+    var sphere: Sphere = undefined;
+
+    var current: usize = 0;
+    if (pin1 != null and pin2 != null and pin3 != null) {
+        sphere = Sphere.circumsphereTriangle(pin1.?, pin2.?, pin3.?);
+    } else if (pin1 != null and pin2 != null) {
+        sphere = Sphere.fromDiameter(pin1.?, pin2.?);
+    } else if (pin1 != null) {
+        sphere = Sphere.fromDiameter(points[current], pin1.?);
+        current += 1;
+    } else {
+        sphere = Sphere.fromDiameter(points[current], points[current + 1]);
+        current += 2;
+    }
+
+    while (current < end) {
+        if (!sphere.contains(points[current])) {
+            if (pin1 != null and pin2 != null and pin3 != null) {
+                sphere = Sphere.circumsphere(pin1.?, pin2.?, pin3.?, points[current]);
+            } else if (pin1 != null and pin2 != null) {
+                sphere = smallestEnclosingSphereImpl(points, current, pin1, pin2, points[current]);
+            } else if (pin1 != null) {
+                sphere = smallestEnclosingSphereImpl(points, current, pin1, points[current], null);
+            } else {
+                sphere = smallestEnclosingSphereImpl(points, current, points[current], null, null);
+            }
+        }
+        current += 1;
+    }
+
+    return sphere;
+}
+
+pub fn smallestEnclosingSphere(points: []const Vec3) Sphere {
+    std.debug.assert(points.len > 1);
+    return smallestEnclosingSphereImpl(points, points.len, null, null, null);
+}
+
+pub fn average(comptime T: type, values: []const T) T {
+    var sum: T = 0;
+    for (values) |value| {
+        sum += value;
+    }
+    return sum / values.len;
+}
+
 const testing = std.testing;
 const float_tolerance = 0.0001;
 
@@ -1257,4 +1380,19 @@ test "mat.inverse" {
     try testing.expectApproxEqRel(1.0 / 3961.0 * -236, v[3][1], float_tolerance);
     try testing.expectApproxEqRel(1.0 / 3961.0 * 543, v[3][2], float_tolerance);
     try testing.expectApproxEqRel(1.0 / 3961.0 * -182, v[3][3], float_tolerance);
+}
+
+test "sphere.contains" {
+    const s = smallestEnclosingSphere(&.{
+        .{ 1.0, 1.0, 0.0 },
+        .{ 1.0, -1.0, 0.0 },
+        .{ -1.0, -1.0, 0.0 },
+        .{ -1.0, 1.0, 0.0 },
+    });
+
+    try testing.expect(s.contains(.{ 1.0, 1.0, 0.0 }));
+    try testing.expect(s.contains(.{ 1.0, 0.0, 1.0 }));
+    try testing.expect(!s.contains(.{ 1.41, 1.0, 0.0 }));
+    try testing.expect(s.contains(.{ 1.41, 0.0, 0.0 }));
+    try testing.expect(!s.contains(.{ 1.42, 1.0, 0.0 }));
 }
