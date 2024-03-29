@@ -687,6 +687,117 @@ pub const mat = struct {
         }
     }
 
+    pub fn inverse(m: anytype) @TypeOf(m) {
+        const T = @TypeOf(m);
+        const size = matsize(T);
+
+        const Vec = Child(T);
+        const C = Child(Vec);
+
+        switch (size) {
+            2 => {
+                const rd = 1 / determinant(m);
+
+                const m0 = @shuffle(C, m[0], m[1], Vec4i{ -2, 1, -1, 0 });
+                const m1 = @Vector(4, C){ rd, -rd, -rd, rd };
+
+                const a0 = m0 * m1;
+
+                const f0 = @shuffle(C, a0, undefined, Vec2i{ 0, 1 });
+                const f1 = @shuffle(C, a0, undefined, Vec2i{ 2, 3 });
+
+                return .{ f0, f1 };
+            },
+            3 => {
+                // https://www.onlinemathstutor.org/post/3x3_inverses
+                const a = vec.cross(m[1], m[2]);
+                const b = vec.cross(m[2], m[0]);
+                const c = vec.cross(m[0], m[1]);
+
+                var inv: Matrix(Vec) = .{ a, b, c };
+                inv = mat.transpose(inv);
+
+                const det = vec.dot(m[0], a);
+                const rq = 1 / det;
+
+                return mulScalar(inv, rq);
+            },
+            4 => {
+                // https://gitlab.com/libeigen/eigen/-/blob/master/Eigen/src/LU/arch/InverseSize4.h
+                const a = @shuffle(C, m[0], m[1], mask.movelh);
+                const b = @shuffle(C, m[1], m[0], mask.movehl);
+                const c = @shuffle(C, m[2], m[3], mask.movelh);
+                const d = @shuffle(C, m[3], m[2], mask.movehl);
+
+                const mask0 = Vec4i{ 3, 3, 0, 0 };
+                const mask1 = Vec4i{ 1, 1, 2, 2 };
+                const mask2 = Vec4i{ 2, 3, 0, 1 };
+                const mask3 = Vec4i{ 3, 3, 1, 1 };
+
+                var ab = @shuffle(C, a, undefined, mask0) * b;
+                ab = ab - (@shuffle(C, a, undefined, mask1) * @shuffle(C, b, undefined, mask2));
+
+                var dc = @shuffle(C, d, undefined, mask0) * c;
+                dc = dc - (@shuffle(C, d, undefined, mask1) * @shuffle(C, c, undefined, mask2));
+
+                var det_a = @shuffle(C, a, undefined, mask3) * a;
+                det_a = det_a - @shuffle(C, det_a, undefined, mask.movehl_1);
+
+                var det_b = @shuffle(C, b, undefined, mask3) * b;
+                det_b = det_b - @shuffle(C, det_b, undefined, mask.movehl_1);
+
+                var det_c = @shuffle(C, c, undefined, mask3) * c;
+                det_c = det_c - @shuffle(C, det_c, undefined, mask.movehl_1);
+
+                var det_d = @shuffle(C, d, undefined, mask3) * d;
+                det_d = det_d - @shuffle(C, det_d, undefined, mask.movehl_1);
+
+                var x = @shuffle(C, dc, undefined, Vec4i{ 0, 2, 1, 3 }) * ab;
+                x = x + @shuffle(C, x, undefined, mask.movehl_1);
+                x = x + @shuffle(C, x, undefined, Vec4i{ 1, 0, 0, 0 });
+
+                const d1 = det_a * det_d;
+                const d2 = det_b * det_c;
+
+                const t = (d1 + d2) - x;
+                const det = @shuffle(C, t, undefined, Vec4i{ 0, 0, 0, 0 });
+                var rd = @as(Vec, @splat(1)) / det;
+
+                var id = @shuffle(C, c, undefined, Vec4i{ 0, 0, 2, 2 }) * @shuffle(C, ab, undefined, mask.movelh_1);
+                id = id + (@shuffle(C, c, undefined, Vec4i{ 1, 1, 3, 3 }) * @shuffle(C, ab, undefined, mask.movehl_1));
+                id = (d * @shuffle(C, det_a, undefined, Vec4i{ 0, 0, 0, 0 })) - id;
+
+                var ia = @shuffle(C, b, undefined, Vec4i{ 0, 0, 2, 2 }) * @shuffle(C, dc, undefined, mask.movelh_1);
+                ia = ia + (@shuffle(C, b, undefined, Vec4i{ 1, 1, 3, 3 }) * @shuffle(C, dc, undefined, mask.movehl_1));
+                ia = (a * @shuffle(C, det_d, undefined, Vec4i{ 0, 0, 0, 0 })) - ia;
+
+                var ib = d * @shuffle(C, ab, undefined, Vec4i{ 3, 0, 3, 0 });
+                ib = ib - (@shuffle(C, d, undefined, Vec4i{ 1, 0, 3, 2 }) * @shuffle(C, ab, undefined, Vec4i{ 2, 1, 2, 1 }));
+                ib = (c * @shuffle(C, det_b, undefined, Vec4i{ 0, 0, 0, 0 })) - ib;
+
+                var ic = a * @shuffle(C, dc, undefined, Vec4i{ 3, 0, 3, 0 });
+                ic = ic - (@shuffle(C, a, undefined, Vec4i{ 1, 0, 3, 2 }) * @shuffle(C, dc, undefined, Vec4i{ 2, 1, 2, 1 }));
+                ic = (b * @shuffle(C, det_c, undefined, Vec4i{ 0, 0, 0, 0 })) - ic;
+
+                const sign = Vec{ 1, -1, -1, 1 };
+                rd *= sign;
+
+                ia *= rd;
+                ib *= rd;
+                ic *= rd;
+                id *= rd;
+
+                const m0 = @shuffle(C, ia, ib, Vec4i{ 3, 1, -4, -2 });
+                const m1 = @shuffle(C, ia, ib, Vec4i{ 2, 0, -3, -1 });
+                const m2 = @shuffle(C, ic, id, Vec4i{ 3, 1, -4, -2 });
+                const m3 = @shuffle(C, ic, id, Vec4i{ 2, 0, -3, -1 });
+
+                return .{ m0, m1, m2, m3 };
+            },
+            else => unsupportedType(T),
+        }
+    }
+
     pub fn orthographic(left: f32, right: f32, top: f32, bottom: f32, near: f32, far: f32) Mat4 {
         var out = zero(Mat4);
         out[0][0] = 2 / (right - left);
@@ -1088,4 +1199,62 @@ test "mat.determinant" {
     };
 
     try testing.expectApproxEqRel(-306, mat.determinant(c), float_tolerance);
+}
+
+test "mat.inverse" {
+    const a = Mat2{
+        .{ 4, 6 },
+        .{ 3, 8 },
+    };
+
+    const b = mat.inverse(a);
+
+    try testing.expectApproxEqRel(1.0 / 14.0 * 8, b[0][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 14.0 * -6, b[0][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 14.0 * -3, b[1][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 14.0 * 4, b[1][1], float_tolerance);
+
+    const x = Mat3{
+        .{ 6, 1, 1 },
+        .{ 4, -2, 5 },
+        .{ 2, 8, 7 },
+    };
+
+    const y = mat.inverse(x);
+
+    try testing.expectApproxEqRel(1.0 / 306.0 * 54, y[0][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * -1, y[0][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * -7, y[0][2], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * 18, y[1][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * -40, y[1][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * 26, y[1][2], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * -36, y[2][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * 46, y[2][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 306.0 * 16, y[2][2], float_tolerance);
+
+    const u = Mat4{
+        .{ 2, 1, 9, 3 },
+        .{ 8, 9, 2, 1 },
+        .{ 6, 4, 2, 9 },
+        .{ 7, 0, 1, 3 },
+    };
+
+    const v = mat.inverse(u);
+
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -47, v[0][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * 99, v[0][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -211, v[0][2], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * 647, v[0][3], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -58, v[1][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * 375, v[1][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * 161, v[1][2], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -550, v[1][3], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * 473, v[2][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * 15, v[2][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -152, v[2][2], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -22, v[2][3], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -48, v[3][0], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -236, v[3][1], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * 543, v[3][2], float_tolerance);
+    try testing.expectApproxEqRel(1.0 / 3961.0 * -182, v[3][3], float_tolerance);
 }
