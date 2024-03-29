@@ -1384,15 +1384,15 @@ test "mat.inverse" {
 
 test "sphere.contains" {
     const s = smallestEnclosingSphere(&.{
-        .{ 1.0, 1.0, 0.0 },
-        .{ 1.0, -1.0, 0.0 },
-        .{ -1.0, -1.0, 0.0 },
-        .{ -1.0, 1.0, 0.0 },
+        .{ 2.0, 1.0, 0.0 },
+        .{ 2.0, -1.0, 0.0 },
+        .{ 0.0, -1.0, 0.0 },
+        .{ 0.0, 1.0, 0.0 },
     });
 
-    try testing.expect(s.contains(.{ 1.0, 1.0, 0.0 }));
-    try testing.expect(s.contains(.{ 1.0, 0.0, 1.0 }));
-    try testing.expect(!s.contains(.{ 1.41, 1.0, 0.0 }));
-    try testing.expect(s.contains(.{ 1.41, 0.0, 0.0 }));
-    try testing.expect(!s.contains(.{ 1.42, 0.0, 0.0 }));
+    try testing.expect(s.contains(.{ 2.0, 1.0, 0.0 }));
+    try testing.expect(s.contains(.{ 2.0, 0.0, 1.0 }));
+    try testing.expect(!s.contains(.{ 2.41, 1.0, 0.0 }));
+    try testing.expect(s.contains(.{ 2.41, 0.0, 0.0 }));
+    try testing.expect(!s.contains(.{ 2.42, 0.0, 0.0 }));
 }
