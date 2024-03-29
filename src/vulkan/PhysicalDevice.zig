@@ -12,8 +12,8 @@ const vki = dispatch.vki;
 
 const InstanceDispatch = dispatch.InstanceDispatch;
 
-const vkk_options = if (@hasDecl(root, "vkk_options")) root.vkk_options else struct {};
-const physical_device_override = if (@hasDecl(vkk_options, "physical_device_override")) vkk_options.physical_device_override else struct {};
+const vk_options = if (@hasDecl(root, "vk_options")) root.vk_options else struct {};
+const physical_device_override = if (@hasDecl(vk_options, "physical_device_override")) vk_options.physical_device_override else struct {};
 
 /// Max number of physical devices.
 ///

@@ -14,8 +14,8 @@ const vkd = dispatch.vkd;
 const InstanceDispatch = dispatch.InstanceDispatch;
 const DeviceDispatch = dispatch.DeviceDispatch;
 
-const vkk_options = if (@hasDecl(root, "vkk_options")) root.vkk_options else struct {};
-const swapchain_override = if (@hasDecl(vkk_options, "swapchain_override")) vkk_options.swapchain_override else struct {};
+const vk_options = if (@hasDecl(root, "vk_options")) root.vk_options else struct {};
+const swapchain_override = if (@hasDecl(vk_options, "swapchain_override")) vk_options.swapchain_override else struct {};
 
 /// Max number of surface formats.
 ///
