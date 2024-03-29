@@ -8,7 +8,7 @@ const Child = std.meta.Child;
 
 // Right handed
 
-// Row major
+// Column major
 
 pub const Vec2i = @Vector(2, i32);
 pub const Vec3i = @Vector(3, i32);
@@ -434,7 +434,7 @@ pub const mat = struct {
         return [vec_len]@Vector(vec_len, Child(Vec));
     }
 
-    pub fn mulVec(v: anytype, m: Matrix(@TypeOf(v))) @TypeOf(v) {
+    pub fn mulVec(m: anytype, v: Child(@TypeOf(m))) @TypeOf(v) {
         const size = matsize(@TypeOf(m));
 
         const T = Child(@TypeOf(v));
@@ -493,7 +493,7 @@ pub const mat = struct {
 
         var out: T = undefined;
         inline for (0..size) |i| {
-            out[i] = mulVec(x[i], y);
+            out[i] = mulVec(y, x[i]);
         }
 
         return out;
@@ -1252,12 +1252,12 @@ test "mat.translate" {
     m = mat.translate(m, .{ 1, 2, 3 });
 
     const pos = Vec4{ 0, 0, 0, 1 };
-    const out = mat.mulVec(pos, m);
+    const out = mat.mulVec(m, pos);
 
     try testing.expectEqual(.{ 1, 2, 3, 1 }, out);
 
     const t = mat.translation(.{ 1, 2, 3 });
-    const p = mat.mulVec(Vec4{ 0, 0, 0, 1 }, t);
+    const p = mat.mulVec(t, Vec4{ 0, 0, 0, 1 });
     try testing.expectEqual(.{ 1, 2, 3, 1 }, p);
 }
 
@@ -1267,26 +1267,26 @@ test "mat.rotate" {
     var m = mat.identity(Mat4);
     m = mat.rotate(m, std.math.degreesToRadians(180), .{ 1, 0, 0 });
 
-    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[0], float_tolerance);
-    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[1], float_tolerance);
-    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[2], float_tolerance);
-    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[3], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(m, pos)[0], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(m, pos)[1], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(m, pos)[2], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(m, pos)[3], float_tolerance);
 
     m = mat.identity(Mat4);
     m = mat.rotate(m, std.math.degreesToRadians(180), .{ 0, 1, 0 });
 
-    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[0], float_tolerance);
-    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[1], float_tolerance);
-    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[2], float_tolerance);
-    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[3], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(m, pos)[0], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(m, pos)[1], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(m, pos)[2], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(m, pos)[3], float_tolerance);
 
     m = mat.identity(Mat4);
     m = mat.rotate(m, std.math.degreesToRadians(180), .{ 0, 0, 1 });
 
-    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[0], float_tolerance);
-    try testing.expectApproxEqRel(-1, mat.mulVec(pos, m)[1], float_tolerance);
-    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[2], float_tolerance);
-    try testing.expectApproxEqRel(1, mat.mulVec(pos, m)[3], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(m, pos)[0], float_tolerance);
+    try testing.expectApproxEqRel(-1, mat.mulVec(m, pos)[1], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(m, pos)[2], float_tolerance);
+    try testing.expectApproxEqRel(1, mat.mulVec(m, pos)[3], float_tolerance);
 }
 
 test "mat.scale" {
@@ -1295,7 +1295,7 @@ test "mat.scale" {
     var m = mat.identity(Mat4);
     m = mat.scale(m, .{ 2, 3, 4 });
 
-    try testing.expectEqual(.{ 2, 3, 4, 1 }, mat.mulVec(pos, m));
+    try testing.expectEqual(.{ 2, 3, 4, 1 }, mat.mulVec(m, pos));
 }
 
 test "mat.determinant" {

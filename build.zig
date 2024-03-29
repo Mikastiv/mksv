@@ -4,10 +4,26 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const build_options = b.addOptions();
+
+    const vk_registry = b.option([]const u8, "vk_registry", "Path to the Vulkan registry") orelse b.pathFromRoot("vk.xml");
+    const vk_enable_validation = b.option(bool, "vk_enable_validation", "Enable vulkan validation layers");
+    const vk_verbose = b.option(bool, "vk_verbose", "Enable debug output");
+
+    build_options.addOption(bool, "vk_enable_validation", vk_enable_validation orelse false);
+    build_options.addOption(bool, "vk_verbose", vk_verbose orelse false);
+
+    const vkzig_dep = b.dependency("vulkan_zig", .{
+        .registry = vk_registry,
+    });
+
     const mksv = b.addModule("mksv", .{
         .root_source_file = .{ .path = "src/root.zig" },
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "vulkan-zig", .module = vkzig_dep.module("vulkan-zig") },
+        },
     });
 
     const exe = b.addExecutable(.{
