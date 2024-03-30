@@ -62,17 +62,6 @@ pub const DeletionQueue = struct {
         try self.entries.append(.{ .handle = handle_raw, .type = handle_type });
     }
 
-    pub fn appendImage(self: *DeletionQueue, image: vulkan.AllocatedImage) !void {
-        try self.append(image.handle);
-        try self.append(image.memory);
-        try self.append(image.view);
-    }
-
-    pub fn appendBuffer(self: *DeletionQueue, buffer: vulkan.AllocatedBuffer) !void {
-        try self.append(buffer.handle);
-        try self.append(buffer.memory);
-    }
-
     pub fn flush(self: *DeletionQueue, device: vk.Device) void {
         assert(device != .null_handle);
 
@@ -122,26 +111,6 @@ pub fn destroyImage(device: vk.Device, image: vulkan.AllocatedImage) void {
     vkd().destroyImageView(device, image.view, null);
     vkd().destroyImage(device, image.handle, null);
     vkd().freeMemory(device, image.memory, null);
-}
-
-pub fn allocateBufferMemory(
-    device: vk.Device,
-    physical_device: vk.PhysicalDevice,
-    buffer: vk.Buffer,
-    property_flags: vk.MemoryPropertyFlags,
-) !vulkan.AllocatedMemory {
-    const requirements = vkd().getBufferMemoryRequirements(device, buffer);
-    return allocateMemory(device, physical_device, property_flags, requirements);
-}
-
-pub fn allocateImageMemory(
-    device: vk.Device,
-    physical_device: vk.PhysicalDevice,
-    image: vk.Image,
-    property_flags: vk.MemoryPropertyFlags,
-) !vulkan.AllocatedMemory {
-    const requirements = vkd().getImageMemoryRequirements(device, image);
-    return allocateMemory(device, physical_device, property_flags, requirements);
 }
 
 pub fn allocateMemory(

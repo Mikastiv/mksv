@@ -563,7 +563,7 @@ pub const mat = struct {
     }
 
     pub fn scaleScalar(m: Mat4, s: f32) Mat4 {
-        return scale(m, .{ s, s, s });
+        return mat.scale(m, .{ s, s, s });
     }
 
     pub fn translation(t: Vec3) Mat4 {
@@ -985,6 +985,14 @@ pub fn average(comptime T: type, values: []const T) T {
         sum += value;
     }
     return sum / values.len;
+}
+
+pub fn scale(comptime T: type, value: T, factor: f32) T {
+    if (@typeInfo(T) != .Int) @compileError("only integer");
+
+    const value_float: f32 = @floatFromInt(value);
+    const scaled = value_float * factor;
+    return @intFromFloat(scaled);
 }
 
 const testing = std.testing;
