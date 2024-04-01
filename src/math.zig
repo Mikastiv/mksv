@@ -42,11 +42,11 @@ pub const Plane = struct {
 
     pub fn pointDistance(self: Plane, point: Vec3) f32 {
         checkNormalized(self.normal());
-        return vec.dot(self.data, .{ point[0], point[1], point[2], 1 });
+        return vec.dot(self.data, vec.vec4(point));
     }
 
     pub fn normal(self: Plane) Vec3 {
-        return .{ self.data[0], self.data[1], self.data[2] };
+        return vec.swizzle3(self.data, .x, .y, .z);
     }
 };
 
@@ -889,7 +889,7 @@ pub const Sphere = struct {
         const c2 = vec.length2(c);
         const d2 = vec.length2(d);
 
-        const detInv = 1.0 / mat.determinant(Mat4{
+        const det_inv = 1.0 / mat.determinant(Mat4{
             .{ a[0], a[1], a[2], 1 },
             .{ b[0], b[1], b[2], 1 },
             .{ c[0], c[1], c[2], 1 },
@@ -915,7 +915,7 @@ pub const Sphere = struct {
             .{ d[0], d[1], d2, 1 },
         });
 
-        const cen = vec.mul(Vec3{ x, y, z }, detInv * 0.5);
+        const cen = vec.mul(Vec3{ x, y, z }, det_inv * 0.5);
 
         return init(cen, vec.distance(cen, a));
     }
@@ -988,7 +988,7 @@ pub fn average(comptime T: type, values: []const T) T {
 }
 
 pub fn scale(comptime T: type, value: T, factor: f32) T {
-    if (@typeInfo(T) != .Int) @compileError("only integer");
+    if (@typeInfo(T) != .Int) @compileError("only accepts integer");
 
     const value_float: f32 = @floatFromInt(value);
     const scaled = value_float * factor;
@@ -1133,11 +1133,24 @@ test "frustum.isPointInside" {
 }
 
 test "mat.add" {
-    const a = mat.identity(Mat4);
-    const b = mat.identity(Mat4);
+    const a = Mat4{
+        .{ 1, 9, 3, 9 },
+        .{ 9, 2, 1, 5 },
+        .{ 4, 3, 9, 0 },
+        .{ 4, 5, 6, 7 },
+    };
+    const b = Mat4{
+        .{ 9, 3, 1, 2 },
+        .{ 1, 1, 4, 5 },
+        .{ 9, 8, 7, 3 },
+        .{ 2, 1, 5, 0 },
+    };
     const c = mat.add(a, b);
 
-    try testing.expectEqual(2, c[1][1]);
+    try testing.expectEqual(a[0] + b[0], c[0]);
+    try testing.expectEqual(a[1] + b[1], c[1]);
+    try testing.expectEqual(a[2] + b[2], c[2]);
+    try testing.expectEqual(a[3] + b[3], c[3]);
 }
 
 test "mat.mulVec" {
