@@ -444,7 +444,7 @@ pub const mat = struct {
                 const v0 = @shuffle(T, v, undefined, Vec4i{ 0, 0, 1, 1 });
                 const m0 = @shuffle(T, m[0], m[1], mask.movelh);
 
-                const a0 = v0 * m0;
+                const a0 = m0 * v0;
 
                 const f0 = @shuffle(T, a0, undefined, Vec4i{ 2, 3, 2, 3 });
                 const g0 = a0 + f0;
@@ -456,9 +456,9 @@ pub const mat = struct {
                 const v1 = @shuffle(T, v, undefined, Vec3i{ 1, 1, 1 });
                 const v2 = @shuffle(T, v, undefined, Vec3i{ 2, 2, 2 });
 
-                const m0 = v0 * m[0];
-                const m1 = v1 * m[1];
-                const m2 = v2 * m[2];
+                const m0 = m[0] * v0;
+                const m1 = m[1] * v1;
+                const m2 = m[2] * v2;
 
                 const a0 = m0 + m1;
 
@@ -470,10 +470,10 @@ pub const mat = struct {
                 const v2 = @shuffle(T, v, undefined, Vec4i{ 2, 2, 2, 2 });
                 const v3 = @shuffle(T, v, undefined, Vec4i{ 3, 3, 3, 3 });
 
-                const m0 = v0 * m[0];
-                const m1 = v1 * m[1];
-                const m2 = v2 * m[2];
-                const m3 = v3 * m[3];
+                const m0 = m[0] * v0;
+                const m1 = m[1] * v1;
+                const m2 = m[2] * v2;
+                const m3 = m[3] * v3;
 
                 const a0 = m0 + m1;
                 const a1 = m2 + m3;
@@ -493,7 +493,7 @@ pub const mat = struct {
 
         var out: T = undefined;
         inline for (0..size) |i| {
-            out[i] = mulVec(y, x[i]);
+            out[i] = mulVec(x, y[i]);
         }
 
         return out;
@@ -1140,6 +1140,38 @@ test "mat.add" {
     try testing.expectEqual(2, c[1][1]);
 }
 
+test "mat.mulVec" {
+    const a = Mat4i{
+        .{ 9, 3, 1, 9 },
+        .{ 5, 4, 7, 6 },
+        .{ 1, 2, 0, 8 },
+        .{ 3, 1, 9, 2 },
+    };
+    const b = Vec4i{ 3, 8, 5, 1 };
+    const c = mat.mulVec(a, b);
+
+    try testing.expectEqual(Vec4i{ 75, 52, 68, 117 }, c);
+
+    const x = Mat3i{
+        .{ 3, 4, 8 },
+        .{ 9, 1, 5 },
+        .{ 8, 2, 8 },
+    };
+    const y = Vec3i{ 7, 9, 1 };
+    const z = mat.mulVec(x, y);
+
+    try testing.expectEqual(Vec3i{ 110, 39, 109 }, z);
+
+    const t = Mat2i{
+        .{ 3, 4 },
+        .{ 9, 1 },
+    };
+    const u = Vec2i{ 7, 9 };
+    const v = mat.mulVec(t, u);
+
+    try testing.expectEqual(Vec2i{ 102, 37 }, v);
+}
+
 test "mat.mul" {
     const a = Mat4i{
         .{ 3, 4, 8, 8 },
@@ -1157,10 +1189,10 @@ test "mat.mul" {
 
     try testing.expectEqual(
         Mat4i{
-            .{ 77, 155, 35, 61 },
-            .{ 86, 140, 20, 49 },
-            .{ 96, 172, 28, 62 },
-            .{ 126, 170, 30, 74 },
+            .{ 137, 57, 124, 84 },
+            .{ 139, 72, 135, 94 },
+            .{ 125, 41, 92, 52 },
+            .{ 61, 14, 41, 18 },
         },
         c,
     );
@@ -1179,9 +1211,9 @@ test "mat.mul" {
 
     try testing.expectEqual(
         Mat3i{
-            .{ 77, 123, 19 },
-            .{ 86, 132, 16 },
-            .{ 96, 156, 20 },
+            .{ 110, 39, 109 },
+            .{ 94, 42, 110 },
+            .{ 98, 23, 77 },
         },
         z,
     );
@@ -1198,8 +1230,8 @@ test "mat.mul" {
 
     try testing.expectEqual(
         Mat2i{
-            .{ 53, 51 },
-            .{ 71, 87 },
+            .{ 102, 37 },
+            .{ 78, 38 },
         },
         v,
     );
@@ -1265,8 +1297,8 @@ test "mat.translate" {
     try testing.expectEqual(.{ 1, 2, 3, 1 }, out);
 
     const t = mat.translation(.{ 1, 2, 3 });
-    const p = mat.mulVec(t, Vec4{ 0, 0, 0, 1 });
-    try testing.expectEqual(.{ 1, 2, 3, 1 }, p);
+    const p = mat.mulVec(t, Vec4{ 4, 6, 8, 1 });
+    try testing.expectEqual(.{ 5, 8, 11, 1 }, p);
 }
 
 test "mat.rotate" {
