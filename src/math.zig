@@ -438,6 +438,7 @@ pub const mat = struct {
         const size = matsize(@TypeOf(m));
 
         const T = Child(@TypeOf(v));
+        const Vec = @TypeOf(v);
 
         switch (size) {
             2 => {
@@ -456,13 +457,22 @@ pub const mat = struct {
                 const v1 = @shuffle(T, v, undefined, Vec3i{ 1, 1, 1 });
                 const v2 = @shuffle(T, v, undefined, Vec3i{ 2, 2, 2 });
 
+                if (@typeInfo(T) == .Int) {
+                    const m0 = m[0] * v0;
+                    const m1 = m[1] * v1;
+                    const m2 = m[2] * v2;
+
+                    const a0 = m0 + m1;
+
+                    return a0 + m2;
+                }
+
+                // .Float
                 const m0 = m[0] * v0;
-                const m1 = m[1] * v1;
-                const m2 = m[2] * v2;
+                const m1 = @mulAdd(Vec, m[1], v1, m0);
+                const m2 = @mulAdd(Vec, m[2], v2, m1);
 
-                const a0 = m0 + m1;
-
-                return a0 + m2;
+                return m2;
             },
             4 => {
                 const v0 = @shuffle(T, v, undefined, Vec4i{ 0, 0, 0, 0 });
@@ -470,15 +480,25 @@ pub const mat = struct {
                 const v2 = @shuffle(T, v, undefined, Vec4i{ 2, 2, 2, 2 });
                 const v3 = @shuffle(T, v, undefined, Vec4i{ 3, 3, 3, 3 });
 
+                if (@typeInfo(T) == .Int) {
+                    const m0 = m[0] * v0;
+                    const m1 = m[1] * v1;
+                    const m2 = m[2] * v2;
+                    const m3 = m[3] * v3;
+
+                    const a0 = m0 + m1;
+                    const a1 = m2 + m3;
+
+                    return a0 + a1;
+                }
+
+                // .Float
                 const m0 = m[0] * v0;
-                const m1 = m[1] * v1;
-                const m2 = m[2] * v2;
-                const m3 = m[3] * v3;
+                const m1 = @mulAdd(Vec, m[1], v1, m0);
+                const m2 = @mulAdd(Vec, m[2], v2, m1);
+                const m3 = @mulAdd(Vec, m[3], v3, m2);
 
-                const a0 = m0 + m1;
-                const a1 = m2 + m3;
-
-                return a0 + a1;
+                return m3;
             },
             else => @compileError("vector and matrix dimensions not supported"),
         }
@@ -1165,15 +1185,15 @@ test "mat.mulVec" {
 
     try testing.expectEqual(Vec4i{ 75, 52, 68, 117 }, c);
 
-    const x = Mat3i{
+    const x = Mat3{
         .{ 3, 4, 8 },
         .{ 9, 1, 5 },
         .{ 8, 2, 8 },
     };
-    const y = Vec3i{ 7, 9, 1 };
+    const y = Vec3{ 7, 9, 1 };
     const z = mat.mulVec(x, y);
 
-    try testing.expectEqual(Vec3i{ 110, 39, 109 }, z);
+    try testing.expectEqual(Vec3{ 110, 39, 109 }, z);
 
     const t = Mat2i{
         .{ 3, 4 },
