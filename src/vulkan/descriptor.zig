@@ -10,21 +10,21 @@ const vkd = dispatch.vkd;
 pub const LayoutBuilder = struct {
     bindings: std.ArrayList(vk.DescriptorSetLayoutBinding),
 
-    pub fn init(allocator: std.mem.Allocator) @This() {
+    pub fn init(allocator: std.mem.Allocator) LayoutBuilder {
         return .{
             .bindings = std.ArrayList(vk.DescriptorSetLayoutBinding).init(allocator),
         };
     }
 
-    pub fn deinit(self: @This()) void {
+    pub fn deinit(self: LayoutBuilder) void {
         self.bindings.deinit();
     }
 
-    pub fn clear(self: *@This()) void {
+    pub fn clear(self: *LayoutBuilder) void {
         self.bindings.clearRetainingCapacity();
     }
 
-    pub fn addBinding(self: *@This(), binding: u32, descriptor_type: vk.DescriptorType) !void {
+    pub fn addBinding(self: *LayoutBuilder, binding: u32, descriptor_type: vk.DescriptorType) !void {
         const new_binding: vk.DescriptorSetLayoutBinding = .{
             .binding = binding,
             .descriptor_type = descriptor_type,
@@ -34,7 +34,7 @@ pub const LayoutBuilder = struct {
         try self.bindings.append(new_binding);
     }
 
-    pub fn build(self: *const @This(), device: vk.Device, shader_stages: vk.ShaderStageFlags) !vk.DescriptorSetLayout {
+    pub fn build(self: *const LayoutBuilder, device: vk.Device, shader_stages: vk.ShaderStageFlags) !vk.DescriptorSetLayout {
         for (self.bindings.items) |*binding| {
             binding.stage_flags = shader_stages;
         }
