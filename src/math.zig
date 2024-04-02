@@ -675,26 +675,26 @@ pub const mat = struct {
                 const mask3 = Vec4i{ 3, 3, 1, 1 };
 
                 var ab = @shuffle(C, a, undefined, mask0) * b;
-                ab = ab - (@shuffle(C, a, undefined, mask1) * @shuffle(C, b, undefined, mask2));
+                ab -= @shuffle(C, a, undefined, mask1) * @shuffle(C, b, undefined, mask2);
 
                 var dc = @shuffle(C, d, undefined, mask0) * c;
-                dc = dc - (@shuffle(C, d, undefined, mask1) * @shuffle(C, c, undefined, mask2));
+                dc -= @shuffle(C, d, undefined, mask1) * @shuffle(C, c, undefined, mask2);
 
                 var det_a = @shuffle(C, a, undefined, mask3) * a;
-                det_a = det_a - @shuffle(C, det_a, undefined, mask.movehl_1);
+                det_a -= @shuffle(C, det_a, undefined, mask.movehl_1);
 
                 var det_b = @shuffle(C, b, undefined, mask3) * b;
-                det_b = det_b - @shuffle(C, det_b, undefined, mask.movehl_1);
+                det_b -= @shuffle(C, det_b, undefined, mask.movehl_1);
 
                 var det_c = @shuffle(C, c, undefined, mask3) * c;
-                det_c = det_c - @shuffle(C, det_c, undefined, mask.movehl_1);
+                det_c -= @shuffle(C, det_c, undefined, mask.movehl_1);
 
                 var det_d = @shuffle(C, d, undefined, mask3) * d;
-                det_d = det_d - @shuffle(C, det_d, undefined, mask.movehl_1);
+                det_d -= @shuffle(C, det_d, undefined, mask.movehl_1);
 
                 var x = @shuffle(C, dc, undefined, Vec4i{ 0, 2, 1, 3 }) * ab;
-                x = x + @shuffle(C, x, undefined, mask.movehl_1);
-                x = x + @shuffle(C, x, undefined, Vec4i{ 1, 0, 0, 0 });
+                x += @shuffle(C, x, undefined, mask.movehl_1);
+                x += @shuffle(C, x, undefined, Vec4i{ 1, 0, 0, 0 });
 
                 const d1 = det_a * det_d;
                 const d2 = det_b * det_c;
@@ -755,26 +755,26 @@ pub const mat = struct {
                 const mask3 = Vec4i{ 3, 3, 1, 1 };
 
                 var ab = @shuffle(C, a, undefined, mask0) * b;
-                ab = ab - (@shuffle(C, a, undefined, mask1) * @shuffle(C, b, undefined, mask2));
+                ab -= @shuffle(C, a, undefined, mask1) * @shuffle(C, b, undefined, mask2);
 
                 var dc = @shuffle(C, d, undefined, mask0) * c;
-                dc = dc - (@shuffle(C, d, undefined, mask1) * @shuffle(C, c, undefined, mask2));
+                dc -= @shuffle(C, d, undefined, mask1) * @shuffle(C, c, undefined, mask2);
 
                 var det_a = @shuffle(C, a, undefined, mask3) * a;
-                det_a = det_a - @shuffle(C, det_a, undefined, mask.movehl_1);
+                det_a -= @shuffle(C, det_a, undefined, mask.movehl_1);
 
                 var det_b = @shuffle(C, b, undefined, mask3) * b;
-                det_b = det_b - @shuffle(C, det_b, undefined, mask.movehl_1);
+                det_b -= @shuffle(C, det_b, undefined, mask.movehl_1);
 
                 var det_c = @shuffle(C, c, undefined, mask3) * c;
-                det_c = det_c - @shuffle(C, det_c, undefined, mask.movehl_1);
+                det_c -= @shuffle(C, det_c, undefined, mask.movehl_1);
 
                 var det_d = @shuffle(C, d, undefined, mask3) * d;
-                det_d = det_d - @shuffle(C, det_d, undefined, mask.movehl_1);
+                det_d -= @shuffle(C, det_d, undefined, mask.movehl_1);
 
                 var x = @shuffle(C, dc, undefined, Vec4i{ 0, 2, 1, 3 }) * ab;
-                x = x + @shuffle(C, x, undefined, mask.movehl_1);
-                x = x + @shuffle(C, x, undefined, Vec4i{ 1, 0, 0, 0 });
+                x += @shuffle(C, x, undefined, mask.movehl_1);
+                x += @shuffle(C, x, undefined, Vec4i{ 1, 0, 0, 0 });
 
                 const d1 = det_a * det_d;
                 const d2 = det_b * det_c;
@@ -784,19 +784,19 @@ pub const mat = struct {
                 var rd = @as(Vec, @splat(1)) / det;
 
                 var id = @shuffle(C, c, undefined, Vec4i{ 0, 0, 2, 2 }) * @shuffle(C, ab, undefined, mask.movelh_1);
-                id = id + (@shuffle(C, c, undefined, Vec4i{ 1, 1, 3, 3 }) * @shuffle(C, ab, undefined, mask.movehl_1));
+                id += @shuffle(C, c, undefined, Vec4i{ 1, 1, 3, 3 }) * @shuffle(C, ab, undefined, mask.movehl_1);
                 id = (d * @shuffle(C, det_a, undefined, Vec4i{ 0, 0, 0, 0 })) - id;
 
                 var ia = @shuffle(C, b, undefined, Vec4i{ 0, 0, 2, 2 }) * @shuffle(C, dc, undefined, mask.movelh_1);
-                ia = ia + (@shuffle(C, b, undefined, Vec4i{ 1, 1, 3, 3 }) * @shuffle(C, dc, undefined, mask.movehl_1));
+                ia += @shuffle(C, b, undefined, Vec4i{ 1, 1, 3, 3 }) * @shuffle(C, dc, undefined, mask.movehl_1);
                 ia = (a * @shuffle(C, det_d, undefined, Vec4i{ 0, 0, 0, 0 })) - ia;
 
                 var ib = d * @shuffle(C, ab, undefined, Vec4i{ 3, 0, 3, 0 });
-                ib = ib - (@shuffle(C, d, undefined, Vec4i{ 1, 0, 3, 2 }) * @shuffle(C, ab, undefined, Vec4i{ 2, 1, 2, 1 }));
+                ib -= @shuffle(C, d, undefined, Vec4i{ 1, 0, 3, 2 }) * @shuffle(C, ab, undefined, Vec4i{ 2, 1, 2, 1 });
                 ib = (c * @shuffle(C, det_b, undefined, Vec4i{ 0, 0, 0, 0 })) - ib;
 
                 var ic = a * @shuffle(C, dc, undefined, Vec4i{ 3, 0, 3, 0 });
-                ic = ic - (@shuffle(C, a, undefined, Vec4i{ 1, 0, 3, 2 }) * @shuffle(C, dc, undefined, Vec4i{ 2, 1, 2, 1 }));
+                ic -= @shuffle(C, a, undefined, Vec4i{ 1, 0, 3, 2 }) * @shuffle(C, dc, undefined, Vec4i{ 2, 1, 2, 1 });
                 ic = (b * @shuffle(C, det_c, undefined, Vec4i{ 0, 0, 0, 0 })) - ic;
 
                 const sign = Vec{ 1, -1, -1, 1 };

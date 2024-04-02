@@ -46,8 +46,8 @@ pub fn main() !void {
             .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
         };
         const s = try std.time.Instant.now();
-        const det = math.mat.determinant(b);
-        std.mem.doNotOptimizeAway(det);
+        const res = math.mat.mul(c, b);
+        std.mem.doNotOptimizeAway(res);
         const end = try std.time.Instant.now();
 
         sum += end.timestamp - s.timestamp;
