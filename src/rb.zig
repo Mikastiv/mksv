@@ -120,6 +120,25 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             return null;
         }
 
+        pub fn replace(self: *Self, old: *Node, new: *Node) !void {
+            if (compareFn(&old.value, &new.value) != .eq) return error.NotEqual;
+
+            switch (old.nodeType()) {
+                .root => self.root = new,
+                .left_child => old.parent().?.left = new,
+                .right_child => old.parent().?.right = new,
+            }
+
+            if (old.left) |node| {
+                node.setParent(new);
+            }
+            if (old.right) |node| {
+                node.setParent(new);
+            }
+
+            new.* = old.*;
+        }
+
         pub fn remove(self: *Self, target: *Node) void {
             assert(self.size > 0);
 
