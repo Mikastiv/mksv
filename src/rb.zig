@@ -642,10 +642,49 @@ test "insert" {
     for (0..node_count) |_| {
         var node = try testing.allocator.create(T.Node);
         node.value = rand.int(i32);
-        _ = tree.insert(node);
+        const res = tree.insert(node);
+        if (res != null) {
+            testing.allocator.destroy(node);
+        }
     }
 
     try testing.expect(tree.isRedBlackTree());
+
+    while (tree.size > 0) {
+        const target = tree.root.?;
+        tree.remove(target);
+        testing.allocator.destroy(target);
+    }
+
+    for (0..node_count / 2) |_| {
+        var node = try testing.allocator.create(T.Node);
+        node.value = rand.int(i32);
+        const res = tree.insert(node);
+        if (res != null) {
+            testing.allocator.destroy(node);
+        }
+    }
+
+    while (tree.size > node_count / 4) {
+        const target = tree.root.?;
+        tree.remove(target);
+        testing.allocator.destroy(target);
+    }
+
+    for (0..node_count / 2) |_| {
+        var node = try testing.allocator.create(T.Node);
+        node.value = rand.int(i32);
+        const res = tree.insert(node);
+        if (res != null) {
+            testing.allocator.destroy(node);
+        }
+    }
+
+    while (tree.size > node_count / 4) {
+        const target = tree.root.?;
+        tree.remove(target);
+        testing.allocator.destroy(target);
+    }
 
     while (tree.size > 0) {
         const target = tree.root.?;
