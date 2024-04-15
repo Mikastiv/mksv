@@ -263,6 +263,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             }
             ptr.left = node;
             ptr.setParent(node.parent());
+
             if (node.isRoot()) {
                 self.root = ptr;
                 self.root.?.setParent(null);
@@ -293,6 +294,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             }
             ptr.right = node;
             ptr.setParent(node.parent());
+
             if (node.isRoot()) {
                 self.root = ptr;
                 self.root.?.setParent(null);
@@ -407,32 +409,26 @@ fn compare(a: *const i32, b: *const i32) std.math.Order {
 }
 
 test "insert" {
+    const node_count = 100000;
     const T = Tree(i32, compare);
     var tree = T{};
 
-    var nodes: [10]T.Node = .{
-        .{ .value = 32 },
-        .{ .value = 64 },
-        .{ .value = 0 },
-        .{ .value = 1 },
-        .{ .value = 8 },
-        .{ .value = 26 },
-        .{ .value = 42 },
-        .{ .value = 2 },
-        .{ .value = 3 },
-        .{ .value = 4 },
-    };
+    var rng = std.Random.DefaultPrng.init(0);
+    const rand = rng.random();
 
-    _ = tree.insert(&nodes[0]);
-    _ = tree.insert(&nodes[1]);
-    _ = tree.insert(&nodes[2]);
-    _ = tree.insert(&nodes[4]);
-    _ = tree.insert(&nodes[3]);
-    _ = tree.insert(&nodes[5]);
-    _ = tree.insert(&nodes[7]);
-    _ = tree.insert(&nodes[6]);
-    _ = tree.insert(&nodes[8]);
-    _ = tree.insert(&nodes[9]);
+    var nodes = try std.ArrayList(*T.Node).initCapacity(testing.allocator, node_count);
+    defer nodes.deinit();
+
+    for (0..node_count) |_| {
+        var node = try testing.allocator.create(T.Node);
+        try nodes.append(node);
+        node.value = rand.int(i32);
+        _ = tree.insert(node);
+    }
 
     try testing.expect(tree.isRedBlackTree());
+
+    for (nodes.items) |node| {
+        testing.allocator.destroy(node);
+    }
 }
