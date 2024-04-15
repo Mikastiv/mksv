@@ -10,6 +10,8 @@ pub fn TreeNode(comptime T: type) type {
     return struct {
         const Self = @This();
 
+        pub const NodeType = enum { root, left_child, right_child };
+
         comptime {
             assert(@alignOf(*Self) > 1);
             assert(@typeInfo(Color).Enum.tag_type == u1);
@@ -40,11 +42,14 @@ pub fn TreeNode(comptime T: type) type {
             self.parent_and_color = (self.parent_and_color & parent_mask) | @intFromEnum(c);
         }
 
-        fn isLeftChild(self: *const Self) bool {
+        fn nodeType(self: *const Self) NodeType {
             if (self.parent()) |ptr| {
-                return ptr.left == self;
+                return if (ptr.left == self)
+                    .left_child
+                else
+                    .right_child;
             }
-            return false;
+            return .root;
         }
 
         fn isRoot(self: *const Self) bool {
@@ -135,16 +140,16 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
                 node.setParent(y.parent());
             }
 
-            if (y.isRoot()) {
-                self.root = x;
-            } else if (y.isLeftChild()) {
-                y.parent().?.left = x;
-            } else {
-                // If y is target's right child, update x_parent because target will be replaced by y later.
-                if (target.right == y) {
-                    x_parent = y;
-                }
-                y.parent().?.right = x;
+            switch (y.nodeType()) {
+                .root => self.root = x,
+                .left_child => y.parent().?.left = x,
+                .right_child => {
+                    // If y is target's right child, update x_parent because target will be replaced by y later.
+                    if (target.right == y) {
+                        x_parent = y;
+                    }
+                    y.parent().?.right = x;
+                },
             }
 
             const removed_black = y.color() == .black;
@@ -153,17 +158,18 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             if (y != target) {
                 y.setColor(target.color());
                 y.setParent(target.parent());
-                if (target.isRoot()) {
-                    self.root = y;
-                } else if (target.isLeftChild()) {
-                    y.parent().?.left = y;
-                } else {
-                    y.parent().?.right = y;
+
+                switch (target.nodeType()) {
+                    .root => self.root = y,
+                    .left_child => y.parent().?.left = y,
+                    .right_child => y.parent().?.right = y,
                 }
+
                 y.left = target.left;
                 if (y.left) |node| {
                     node.setParent(y);
                 }
+
                 y.right = target.right;
                 if (y.right) |node| {
                     node.setParent(y);
@@ -236,7 +242,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             var z = node;
             z.setColor(if (z == self.root) .black else .red); // case 0
             while (z != self.root and z.parent().?.color() == .red) {
-                if (z.parent().?.isLeftChild()) {
+                if (z.parent().?.nodeType() == .left_child) {
                     const uncle = z.parent().?.parent().?.right;
 
                     if (nodeColor(uncle) == .red) { // case 1
@@ -246,7 +252,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
                         z = z.parent().?;
                         z.setColor(if (z == self.root) .black else .red);
                     } else {
-                        if (!z.isLeftChild()) { // case 2
+                        if (z.nodeType() == .right_child) { // case 2
                             z = z.parent().?;
                             self.rotateLeft(z);
                         }
@@ -269,7 +275,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
                         z = z.parent().?;
                         z.setColor(if (z == self.root) .black else .red);
                     } else {
-                        if (z.isLeftChild()) { // case 2
+                        if (z.nodeType() == .left_child) { // case 2
                             z = z.parent().?;
                             self.rotateRight(z);
                         }
@@ -474,16 +480,15 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             ptr.left = node;
             ptr.setParent(node.parent());
 
-            if (node.isRoot()) {
-                self.root = ptr;
-                self.root.?.setParent(null);
-            } else {
-                if (node.isLeftChild()) {
-                    node.parent().?.left = ptr;
-                } else {
-                    node.parent().?.right = ptr;
-                }
+            switch (node.nodeType()) {
+                .root => {
+                    self.root = ptr;
+                    self.root.?.setParent(null);
+                },
+                .left_child => node.parent().?.left = ptr,
+                .right_child => node.parent().?.right = ptr,
             }
+
             node.setParent(ptr);
         }
 
@@ -505,16 +510,15 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             ptr.right = node;
             ptr.setParent(node.parent());
 
-            if (node.isRoot()) {
-                self.root = ptr;
-                self.root.?.setParent(null);
-            } else {
-                if (node.isLeftChild()) {
-                    node.parent().?.left = ptr;
-                } else {
-                    node.parent().?.right = ptr;
-                }
+            switch (node.nodeType()) {
+                .root => {
+                    self.root = ptr;
+                    self.root.?.setParent(null);
+                },
+                .left_child => node.parent().?.left = ptr,
+                .right_child => node.parent().?.right = ptr,
             }
+
             node.setParent(ptr);
         }
 
@@ -530,7 +534,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             if (ptr) |node| {
                 return node.color();
             }
-            return .black;
+            return .black; // null is black
         }
 
         fn blackHeight(ptr: ?*Node) ?u64 {
