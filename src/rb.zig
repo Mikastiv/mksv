@@ -361,68 +361,68 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
         //
         // This function should only be called to fix a double black node case
         fn removeFix(self: *Self, x_parent: *Node) void {
-            // Double black nodes always start as a null pointer
-            var x: ?*Node = null;
-            var x_p: ?*Node = x_parent;
+            var x: ?*Node = null; // double black nodes always start as a null pointer
+            var parent: ?*Node = x_parent;
 
             while (self.root != x and nodeColor(x) == .black) {
-                if (x == x_p.?.left) {
-                    var w = x_p.?.right.?;
+                const p = parent.?; // always has a parent when not root
+                if (x == p.left) {
+                    var w = p.right.?;
 
                     if (w.color() == .red) { // case 1
-                        x_p.?.setColor(.red);
+                        p.setColor(.red);
                         w.setColor(.black);
-                        self.rotateLeftWithRoot(x_p.?);
-                        w = x_p.?.right.?;
+                        self.rotateLeftWithRoot(p);
+                        w = p.right.?;
                     }
 
                     if (nodeColor(w.left) == .black and nodeColor(w.right) == .black) { // case 2 and case 3
                         w.setColor(.red);
-                        x = x_p;
-                        x_p = x.?.parent();
+                        x = p;
+                        parent = p.parent();
                     } else {
                         if (nodeColor(w.right) == .black) { // case 4
                             w.setColor(.red);
                             self.rotateRightWithRoot(w);
-                            w = x_p.?.right.?;
+                            w = p.right.?;
                             w.setColor(.black);
                         }
 
                         // case 5
-                        w.setColor(x_p.?.color());
-                        x_p.?.setColor(.black);
+                        w.setColor(p.color());
+                        p.setColor(.black);
                         w.right.?.setColor(.black);
-                        self.rotateLeftWithRoot(x_p.?);
+                        self.rotateLeftWithRoot(p);
                         x = self.root;
                         break;
                     }
                 } else {
-                    var w = x_p.?.left.?;
+                    var w = p.left.?;
 
                     if (w.color() == .red) { // case 1
-                        x_p.?.setColor(.red);
+                        p.setColor(.red);
                         w.setColor(.black);
-                        self.rotateRightWithRoot(x_p.?);
-                        w = x_p.?.left.?;
+                        self.rotateRightWithRoot(p);
+                        w = p.left.?;
                     }
 
                     if (nodeColor(w.right) == .black and nodeColor(w.left) == .black) { // case 2 and case 3
                         w.setColor(.red);
-                        x = x_p;
-                        x_p = x.?.parent();
+                        x = p;
+                        parent = p.parent();
                     } else {
                         if (nodeColor(w.left) == .black) { // case 4
                             w.setColor(.red);
                             self.rotateLeftWithRoot(w);
-                            w = x_p.?.left.?;
+                            w = p.left.?;
                             w.setColor(.black);
                         }
 
                         // case 5
-                        w.setColor(x_p.?.color());
-                        x_p.?.setColor(.black);
+                        w.setColor(p.color());
+                        p.setColor(.black);
                         w.left.?.setColor(.black);
-                        self.rotateRightWithRoot(x_p.?);
+                        self.rotateRightWithRoot(p);
                         x = self.root;
                         break;
                     }
