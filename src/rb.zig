@@ -20,19 +20,16 @@ pub fn TreeNode(comptime T: type) type {
 
         left: ?*Self = null,
         right: ?*Self = null,
-        p: ?*Self = null,
         parent_and_color: usize = 0,
         value: T,
 
         fn parent(self: *const Self) ?*Self {
-            // const ptr = self.parent_and_color & parent_mask;
-            // return if (ptr == 0) null else @ptrFromInt(ptr);
-            return self.p;
+            const ptr = self.parent_and_color & parent_mask;
+            return if (ptr == 0) null else @ptrFromInt(ptr);
         }
 
         fn setParent(self: *Self, ptr: ?*Self) void {
-            // self.parent_and_color = @intFromPtr(ptr) | (self.parent_and_color & ~parent_mask);
-            self.p = ptr;
+            self.parent_and_color = @intFromPtr(ptr) | (self.parent_and_color & ~parent_mask);
         }
 
         fn color(self: *const Self) Color {
