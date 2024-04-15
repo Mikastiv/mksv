@@ -2,56 +2,37 @@ const std = @import("std");
 const mksv = @import("mksv");
 const math = mksv.math;
 
-fn printMask(v: u8) void {
-    const m = 0b11;
-
-    const a = v & m;
-    const b = v >> 2 & m;
-    const c = v >> 4 & m;
-    const d = v >> 6 & m;
-
-    std.debug.print("0x{X:2}: {d} {d} {d} {d}\n", .{ v, a, b, c, d });
-}
-
-pub fn makeMask(comptime a: u8, comptime b: u8, comptime c: u8, comptime d: u8) u8 {
-    return d << 6 | c << 4 | b << 2 | a;
+fn less(a: *const u32, b: *const u32) std.math.Order {
+    return std.math.order(a.*, b.*);
 }
 
 pub fn main() !void {
-    printMask(0x44);
-    printMask(0xEE);
-    printMask(0x88);
-    printMask(0xDD);
+    const T = mksv.rb.Tree(u32, less);
+    var tree = T{};
 
-    printMask(makeMask(0, 1, 1, 2));
-
-    const c = math.Mat4{
-        .{ 2, 1, 9, 3 },
-        .{ 8, 9, 2, 1 },
-        .{ 6, 4, 2, 9 },
-        .{ 7, 0, 1, 3 },
+    var nodes: [10]T.Node = .{
+        .{ .value = 32 },
+        .{ .value = 64 },
+        .{ .value = 0 },
+        .{ .value = 1 },
+        .{ .value = 8 },
+        .{ .value = 26 },
+        .{ .value = 42 },
+        .{ .value = 2 },
+        .{ .value = 3 },
+        .{ .value = 4 },
     };
-    std.debug.print("{d}\n", .{math.mat.determinant(c)});
 
-    const n = try std.time.Instant.now();
-    var r = std.Random.DefaultPrng.init(n.timestamp);
-    const rng = r.random();
+    _ = tree.insert(&nodes[0]);
+    _ = tree.insert(&nodes[1]);
+    _ = tree.insert(&nodes[2]);
+    _ = tree.insert(&nodes[4]);
+    _ = tree.insert(&nodes[3]);
+    _ = tree.insert(&nodes[5]);
+    _ = tree.insert(&nodes[7]);
+    _ = tree.insert(&nodes[6]);
+    _ = tree.insert(&nodes[8]);
+    _ = tree.insert(&nodes[9]);
 
-    var sum: u64 = 0;
-    for (0..100000000) |_| {
-        const b = math.Mat4{
-            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
-            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
-            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
-            .{ rng.float(f32), rng.float(f32), rng.float(f32), rng.float(f32) },
-        };
-        const s = try std.time.Instant.now();
-        const res = math.mat.mul(c, b);
-        std.mem.doNotOptimizeAway(res);
-        const end = try std.time.Instant.now();
-
-        sum += end.timestamp - s.timestamp;
-    }
-
-    std.debug.print("{d}\n", .{sum});
+    try tree.debugPrint();
 }
