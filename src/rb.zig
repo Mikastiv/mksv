@@ -20,16 +20,19 @@ pub fn TreeNode(comptime T: type) type {
 
         left: ?*Self = null,
         right: ?*Self = null,
+        p: ?*Self = null,
         parent_and_color: usize = 0,
         value: T,
 
         fn parent(self: *const Self) ?*Self {
-            const ptr = self.parent_and_color & parent_mask;
-            return if (ptr == 0) null else @ptrFromInt(ptr);
+            // const ptr = self.parent_and_color & parent_mask;
+            // return if (ptr == 0) null else @ptrFromInt(ptr);
+            return self.p;
         }
 
         fn setParent(self: *Self, ptr: ?*Self) void {
-            self.parent_and_color = @intFromPtr(ptr) | (self.parent_and_color & ~parent_mask);
+            // self.parent_and_color = @intFromPtr(ptr) | (self.parent_and_color & ~parent_mask);
+            self.p = ptr;
         }
 
         fn color(self: *const Self) Color {
@@ -51,18 +54,18 @@ pub fn TreeNode(comptime T: type) type {
             return self.parent() == null;
         }
 
-        fn min(ptr: ?*Self) ?*Self {
+        fn min(ptr: *Self) ?*Self {
             var node = ptr;
-            while (node) |n| {
-                node = n.left;
+            while (node.left) |n| {
+                node = n;
             }
             return node;
         }
 
-        fn max(ptr: ?*Self) ?*Self {
+        fn max(ptr: *Self) ?*Self {
             var node = ptr;
-            while (node) |n| {
-                node = n.right;
+            while (node.right) |n| {
+                node = n;
             }
             return node;
         }
@@ -103,6 +106,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
                 return c;
             }
 
+            node.parent_and_color = 0;
             node.setParent(parent);
             node.left = null;
             node.right = null;
@@ -114,9 +118,76 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             return null;
         }
 
-        pub fn remove(self: *Self, node: *Node) void {
-            _ = self; // autofix
-            _ = node; // autofix
+        pub fn remove(self: *Self, target: *Node) void {
+            assert(self.size > 0);
+
+            var y = target;
+
+            // Find node to replace target if target has 2 child (in order successor).
+            if (target.left != null and target.right != null) {
+                y = target.right.?.min().?;
+            }
+
+            // x is null or y's only child.
+            const x = if (y.left != null) y.left else y.right;
+
+            var x_parent = y.parent();
+
+            // Replace y with x.
+            if (x) |node| {
+                node.setParent(y.parent());
+            }
+
+            if (y.isRoot()) {
+                self.root = x;
+            } else if (y.isLeftChild()) {
+                y.parent().?.left = x;
+            } else {
+                // If y is target's right child, update x_parent because target will be replaced by y later.
+                if (target.right == y) {
+                    x_parent = y;
+                }
+                y.parent().?.right = x;
+            }
+
+            const removed_black = y.color() == .black;
+
+            // If y is target's in order successor, transplant y into target's place.
+            if (y != target) {
+                y.setColor(target.color());
+                y.setParent(target.parent());
+                if (target.isRoot()) {
+                    self.root = y;
+                } else if (target.isLeftChild()) {
+                    y.parent().?.left = y;
+                } else {
+                    y.parent().?.right = y;
+                }
+                y.left = target.left;
+                if (y.left) |node| {
+                    node.setParent(y);
+                }
+                y.right = target.right;
+                if (y.right) |node| {
+                    node.setParent(y);
+                }
+            }
+
+            self.size -= 1;
+
+            // Balance tree only if a black node was removed.
+            if (removed_black) {
+                // Tree is empty, nothing to do (root double black case).
+                if (self.root == null) return;
+
+                // x is red, color it black.
+                if (x) |node| {
+                    node.setColor(.black);
+                    return;
+                }
+
+                self.removeFix(x_parent.?);
+            }
         }
 
         pub fn find(self: *Self, key: *const T) ?*Node {
@@ -215,6 +286,148 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
                         return;
                     }
                 }
+            }
+        }
+
+        // P: Parent
+        // X: Double black node
+        // W: X's sibling
+        //
+        // Case 0: Root is double black node (terminal case)
+        //     - Nothing to do
+        //
+        // Case 1: Black parent (P), red sibling (W) with two black child
+        //
+        //     - Left rotation on parent
+        //     - Recolor parent and W
+        //
+        //        P-> B                        W-> B
+        //           / \                          / \
+        //     X->  DB  R <-W     ==>        P-> R   B <-Z
+        //             / \                      / \
+        //        Y-> B   B <-Z            X-> DB  B <-Y
+        //
+        // Case 2: Black parent (P), black sibling (W) with two black child
+        //
+        //     - Recolor W
+        //     - Parent becomes X
+        //
+        //        P-> B                    New X-> B
+        //           / \                          / \
+        //     X->  DB  B <-W     ==>    Old X-> B   R <-W
+        //             / \                          / \
+        //        Y-> B   B <-Z               Y->  B   B <-Z
+        //
+        // Case 3: Red parent (P), black sibling (W) with two black child (terminal case)
+        //
+        //     - Recolor parent and W
+        //
+        //        P-> R                        P-> B
+        //           / \                          / \
+        //     X->  DB  B <-W     ==>        X-> B   R <-W
+        //             / \                          / \
+        //        Y-> B   B <-Z               Y->  B   B <-Z
+        //
+        // Case 4: Black parent (P), black sibling (W) with red left child (Y) and black right child (B)
+        //
+        //     - Right rotation on W
+        //     - Recolor Y and W
+        //
+        //        P-> B                        P-> B
+        //           / \                          / \
+        //     X->  DB  B <-W     ==>        X-> DB  B <-Y
+        //             / \                            \
+        //        Y-> R   B <-Z                        R <-W
+        //                                              \
+        //                                               B <-Z
+        //
+        // Case 5: Red or black parent (P), black sibling (W) with red or black left child (Y)
+        //         and red right child (B) (terminal case)
+        //
+        //     - Left rotation on parent
+        //     - Color W with parent's color
+        //     - Color parent and Z black
+        //
+        //        P-> RB                       W-> RB
+        //           / \                          / \
+        //     X->  DB  B <-W     ==>        P-> B   B <-Z
+        //             / \                      / \
+        //        Y-> RB  R <-Z            X-> B  RB <-Y
+        //
+        // All cases apply to the mirrored cases
+        //
+        // This function should only be called to fix a double black node case
+        fn removeFix(self: *Self, x_parent: *Node) void {
+            // Double black nodes always start as a null pointer
+            var x: ?*Node = null;
+            var x_p: ?*Node = x_parent;
+
+            while (self.root != x and nodeColor(x) == .black) {
+                if (x == x_p.?.left) {
+                    var w = x_p.?.right.?;
+
+                    if (w.color() == .red) { // case 1
+                        x_p.?.setColor(.red);
+                        w.setColor(.black);
+                        self.rotateLeftWithRoot(x_p.?);
+                        w = x_p.?.right.?;
+                    }
+
+                    if (nodeColor(w.left) == .black and nodeColor(w.right) == .black) { // case 2 and case 3
+                        w.setColor(.red);
+                        x = x_p;
+                        x_p = x.?.parent();
+                    } else {
+                        if (nodeColor(w.right) == .black) { // case 4
+                            w.setColor(.red);
+                            self.rotateRightWithRoot(w);
+                            w = x_p.?.right.?;
+                            w.setColor(.black);
+                        }
+
+                        // case 5
+                        w.setColor(x_p.?.color());
+                        x_p.?.setColor(.black);
+                        w.right.?.setColor(.black);
+                        self.rotateLeftWithRoot(x_p.?);
+                        x = self.root;
+                        break;
+                    }
+                } else {
+                    var w = x_p.?.left.?;
+
+                    if (w.color() == .red) { // case 1
+                        x_p.?.setColor(.red);
+                        w.setColor(.black);
+                        self.rotateRightWithRoot(x_p.?);
+                        w = x_p.?.left.?;
+                    }
+
+                    if (nodeColor(w.right) == .black and nodeColor(w.left) == .black) { // case 2 and case 3
+                        w.setColor(.red);
+                        x = x_p;
+                        x_p = x.?.parent();
+                    } else {
+                        if (nodeColor(w.left) == .black) { // case 4
+                            w.setColor(.red);
+                            self.rotateLeftWithRoot(w);
+                            w = x_p.?.left.?;
+                            w.setColor(.black);
+                        }
+
+                        // case 5
+                        w.setColor(x_p.?.color());
+                        x_p.?.setColor(.black);
+                        w.left.?.setColor(.black);
+                        self.rotateRightWithRoot(x_p.?);
+                        x = self.root;
+                        break;
+                    }
+                }
+            }
+
+            if (x) |node| { // case 0 and 2 when parent was red
+                node.setColor(.black);
             }
         }
 
@@ -344,7 +557,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             return height.? + @intFromEnum(node.color());
         }
 
-        fn isRedBlackTree(self: *const Self) bool {
+        pub fn isRedBlackTree(self: *const Self) bool {
             if (self.root == null) return true;
 
             const r = self.root.?;
@@ -355,20 +568,24 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             return blackHeight(self.root) != null;
         }
 
-        pub fn debugPrint(self: *const Self) !void {
+        pub fn debugPrint(self: *const Self, comptime use_color: bool) !void {
             var str = std.ArrayList(u8).init(std.heap.page_allocator);
             defer str.deinit();
 
             const writer = str.writer();
 
             if (self.root) |r| {
-                const config = tty.detectConfig(std.io.getStdOut());
-                try tty.Config.setColor(config, writer, if (r.color() == .black) .black else .red);
-                try writer.print("{d:<3}", .{r.value});
-                try tty.Config.setColor(config, writer, .reset);
+                if (use_color) {
+                    const config = tty.detectConfig(std.io.getStdOut());
+                    try tty.Config.setColor(config, writer, if (r.color() == .black) .black else .red);
+                    try writer.print("{d:<3}", .{r.value});
+                    try tty.Config.setColor(config, writer, .reset);
+                } else {
+                    try writer.print("{d:<3}(B)", .{r.value});
+                }
 
-                try traverseNodes(writer, r.right, "", "\\--", r.left != null);
-                try traverseNodes(writer, r.left, "", "---", false);
+                try traverseNodes(writer, r.right, "", "\\--", r.left != null, use_color);
+                try traverseNodes(writer, r.left, "", "---", false, use_color);
 
                 _ = try writer.write("\n");
             }
@@ -382,23 +599,28 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             padding: []const u8,
             pointer: []const u8,
             has_left_sibling: bool,
+            comptime use_color: bool,
         ) !void {
-            const max_line_len = 128;
+            const max_line_len = 1024;
             if (node) |n| {
                 try writer.print("\n{s}{s}", .{ padding, pointer });
 
-                const config = tty.detectConfig(std.io.getStdOut());
-                try tty.Config.setColor(config, writer, if (n.color() == .black) .black else .red);
-                try writer.print("{d:<3}", .{n.value});
-                try tty.Config.setColor(config, writer, .reset);
+                if (use_color) {
+                    const config = tty.detectConfig(std.io.getStdOut());
+                    try tty.Config.setColor(config, writer, if (n.color() == .black) .black else .red);
+                    try writer.print("{d:<3}", .{n.value});
+                    try tty.Config.setColor(config, writer, .reset);
+                } else {
+                    try writer.print("{d:<3}{s}", .{ n.value, if (n.color() == .black) "(B)" else "(R)" });
+                }
 
                 var buffer = try std.BoundedArray(u8, max_line_len).init(0);
                 const w = buffer.writer();
                 _ = try w.write(padding);
                 _ = try w.write(if (has_left_sibling) "|  " else "   ");
 
-                try traverseNodes(writer, n.right, buffer.constSlice(), "\\--", n.left != null);
-                try traverseNodes(writer, n.left, buffer.constSlice(), "---", false);
+                try traverseNodes(writer, n.right, buffer.constSlice(), "\\--", n.left != null, use_color);
+                try traverseNodes(writer, n.left, buffer.constSlice(), "---", false, use_color);
             }
         }
     };
@@ -416,19 +638,17 @@ test "insert" {
     var rng = std.Random.DefaultPrng.init(0);
     const rand = rng.random();
 
-    var nodes = try std.ArrayList(*T.Node).initCapacity(testing.allocator, node_count);
-    defer nodes.deinit();
-
     for (0..node_count) |_| {
         var node = try testing.allocator.create(T.Node);
-        try nodes.append(node);
         node.value = rand.int(i32);
         _ = tree.insert(node);
     }
 
     try testing.expect(tree.isRedBlackTree());
 
-    for (nodes.items) |node| {
-        testing.allocator.destroy(node);
+    while (tree.size > 0) {
+        const target = tree.root.?;
+        tree.remove(target);
+        testing.allocator.destroy(target);
     }
 }
