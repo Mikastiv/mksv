@@ -180,6 +180,7 @@ comptime {
                 \\movq 0x40(%rsi), %rax
                 \\jmpq *%rax
             ),
+            else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
         },
         else => @compileError("fibers not implemented for os " ++ @tagName(builtin.os.tag)),
     }
