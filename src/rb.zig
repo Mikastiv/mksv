@@ -129,11 +129,11 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
                 .right_child => old.parent().?.right = new,
             }
 
-            if (old.left) |node| {
-                node.setParent(new);
+            if (old.left) |left| {
+                left.setParent(new);
             }
-            if (old.right) |node| {
-                node.setParent(new);
+            if (old.right) |right| {
+                right.setParent(new);
             }
 
             new.* = old.*;
@@ -185,13 +185,13 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
                 }
 
                 y.left = target.left;
-                if (y.left) |node| {
-                    node.setParent(y);
+                if (y.left) |left| {
+                    left.setParent(y);
                 }
 
                 y.right = target.right;
-                if (y.right) |node| {
-                    node.setParent(y);
+                if (y.right) |right| {
+                    right.setParent(y);
                 }
             }
 
@@ -493,8 +493,8 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             const ptr = node.right.?;
 
             node.right = ptr.left;
-            if (ptr.left) |p| {
-                p.setParent(node);
+            if (ptr.left) |left| {
+                left.setParent(node);
             }
             ptr.left = node;
             ptr.setParent(node.parent());
@@ -523,8 +523,8 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             const ptr = node.left.?;
 
             node.left = ptr.right;
-            if (ptr.right) |p| {
-                p.setParent(node);
+            if (ptr.right) |right| {
+                right.setParent(node);
             }
             ptr.right = node;
             ptr.setParent(node.parent());
@@ -549,6 +549,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
             self.rotateRight(node);
         }
 
+        // Use this if the node can be null
         fn nodeColor(ptr: ?*Node) Color {
             if (ptr) |node| {
                 return node.color();
