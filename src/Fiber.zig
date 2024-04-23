@@ -103,11 +103,11 @@ pub fn init(
     errdefer allocator.free(memory);
 
     const end = if (builtin.os.tag == .windows)
-        memory.len - 8
+        memory.len
     else
         std.mem.alignBackward(usize, memory.len - red_zone_bytes, stack_alignment);
 
-    const stack_top = &memory[end];
+    const stack_top = &memory[end - 8];
 
     const context: Context = .{
         .registers = Registers.initDefault(0, .{
