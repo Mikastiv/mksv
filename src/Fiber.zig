@@ -23,7 +23,7 @@ pub const NonVolatileRegister = switch (builtin.os.tag) {
             stack_pointer = 9,
             program_counter = 10,
         },
-        else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
+        else => architectureUnsupported(),
     },
     .linux => switch (builtin.cpu.arch) {
         .x86_64 => enum(u8) {
@@ -38,9 +38,9 @@ pub const NonVolatileRegister = switch (builtin.os.tag) {
             stack_pointer = 7,
             program_counter = 8,
         },
-        else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
+        else => architectureUnsupported(),
     },
-    else => @compileError("fibers not implemented for os " ++ @tagName(builtin.os.tag)),
+    else => osUnsupported(),
 };
 
 pub const Registers = std.EnumArray(NonVolatileRegister, u64);
@@ -99,6 +99,8 @@ pub extern fn switchTo(from: *Fiber, to: *Fiber) callconv(.C) void;
 comptime {
     switch (builtin.os.tag) {
         .windows => switch (builtin.cpu.arch) {
+            // from -> rcx
+            // to -> rdx
             .x86_64 => asm (
                 \\.global switchTo;
                 \\
@@ -138,9 +140,11 @@ comptime {
                 \\movq 0x50(%rdx), %rax
                 \\jmpq *%rax
             ),
-            else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
+            else => architectureUnsupported(),
         },
         .linux => switch (builtin.cpu.arch) {
+            // from -> rdi
+            // to -> rsi
             .x86_64 => asm (
                 \\.global switchTo;
                 \\
@@ -176,8 +180,17 @@ comptime {
                 \\movq 0x40(%rsi), %rax
                 \\jmpq *%rax
             ),
-            else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
+            else => architectureUnsupported(),
         },
-        else => @compileError("fibers not implemented for os " ++ @tagName(builtin.os.tag)),
+        else => osUnsupported(),
     }
+}
+
+fn osUnsupported() void {
+    @compileError("fibers not implemented for os " ++ @tagName(builtin.os.tag));
+}
+
+fn architectureUnsupported() void {
+    @compileError("fibers not implemented for architecture " ++
+        @tagName(builtin.cpu.arch) ++ " on os " ++ @tagName(builtin.os.tag));
 }
