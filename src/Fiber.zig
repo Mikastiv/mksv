@@ -36,6 +36,7 @@ pub const NonVolatileRegister = switch (builtin.os.tag) {
             rsp = 7,
             rip = 8,
         },
+        else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
     },
     else => @compileError("fibers not implemented for os " ++ @tagName(builtin.os.tag)),
 };
