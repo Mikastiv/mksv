@@ -11,6 +11,8 @@ const FiberData = struct {
 };
 
 pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
     // const T = mksv.avl.Tree(u32, less);
     // var tree = T{};
 
@@ -42,6 +44,8 @@ pub fn main() !void {
 
     // try tree.debugPrint();
 
+    const stack_size = std.mem.page_size * 4;
+
     var data1: FiberData = .{
         .text = "hello",
     };
@@ -52,10 +56,10 @@ pub fn main() !void {
     main_fiber = try mksv.Fiber.switchThreadToFiber();
     defer main_fiber.deinit();
 
-    read_fiber = try mksv.Fiber.init(std.heap.page_allocator, std.mem.page_size, read, @as(*anyopaque, @ptrCast(&data1)));
+    read_fiber = try mksv.Fiber.init(allocator, stack_size, read, @ptrCast(&data1));
     defer read_fiber.deinit();
 
-    write_fiber = try mksv.Fiber.init(std.heap.page_allocator, std.mem.page_size, write, @as(*anyopaque, @ptrCast(&data2)));
+    write_fiber = try mksv.Fiber.init(allocator, stack_size, write, @ptrCast(&data2));
     defer write_fiber.deinit();
 
     main_fiber.switchTo(&read_fiber);

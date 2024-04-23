@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 const assert = std.debug.assert;
 
 const stack_alignment = 16;
+const red_zone_bytes = 128;
 
 pub const minimum_stack_size = std.mem.page_size;
 
@@ -43,16 +44,49 @@ pub const NonVolatileRegister = switch (builtin.os.tag) {
     else => osUnsupported(),
 };
 
+pub const NonVolatileSimdRegister = switch (builtin.os.tag) {
+    .windows => switch (builtin.cpu.arch) {
+        .x86_64 => enum(u8) {
+            xmm6 = 0,
+            xmm7 = 1,
+            xmm8 = 2,
+            xmm9 = 3,
+            xmm10 = 4,
+            xmm11 = 5,
+            xmm12 = 6,
+            xmm13 = 7,
+            xmm14 = 8,
+            xmm15 = 9,
+        },
+        else => architectureUnsupported(),
+    },
+    .linux => switch (builtin.cpu.arch) {
+        .x86_64 => enum(u8) {},
+        else => architectureUnsupported(),
+    },
+    else => osUnsupported(),
+};
+
 pub const Registers = std.EnumArray(NonVolatileRegister, u64);
+pub const SimdRegisters = std.EnumArray(NonVolatileSimdRegister, u64);
+pub const Context = struct {
+    registers: Registers,
+    simd: if (builtin.os.tag == .windows) SimdRegisters else void,
+};
 
 const Fiber = @This();
 
 comptime {
+    assert(@offsetOf(Context, "registers") == 0);
+    if (builtin.os.tag == .windows) {
+        assert(@offsetOf(Context, "simd") == 88);
+        assert(@offsetOf(SimdRegisters, "values") == 0);
+    }
     assert(@offsetOf(Fiber, "context") == 0);
     assert(@offsetOf(Registers, "values") == 0);
 }
 
-context: Registers,
+context: Context,
 stack_memory: ?[]u8,
 allocator: ?std.mem.Allocator,
 
@@ -64,15 +98,26 @@ pub fn init(
 ) !Fiber {
     comptime assert(stack_size >= minimum_stack_size);
 
-    const memory = try allocator.alignedAlloc(u8, stack_alignment, minimum_stack_size);
+    const size = std.mem.alignForward(usize, stack_size, stack_alignment);
+    const memory = try allocator.alignedAlloc(u8, stack_alignment, size);
     errdefer allocator.free(memory);
 
-    const stack_top = &memory[memory.len - @sizeOf(usize)];
-    const context = Registers.initDefault(0, .{
-        .program_counter = @intFromPtr(func),
-        .argument = @intFromPtr(arg),
-        .stack_pointer = @intFromPtr(stack_top),
-    });
+    const end = if (builtin.os.tag == .windows)
+        memory.len - 8
+    else
+        std.mem.alignBackward(usize, memory.len - red_zone_bytes, stack_alignment);
+
+    const stack_top = &memory[end];
+
+    const context: Context = .{
+        .registers = Registers.initDefault(0, .{
+            .program_counter = @intFromPtr(func),
+            .argument = @intFromPtr(arg),
+            .stack_pointer = @intFromPtr(stack_top),
+        }),
+        .simd = if (builtin.os.tag == .windows) SimdRegisters.initFill(0) else {},
+    };
+
     stack_top.* = 0; // set dummy return address to null
 
     return .{
@@ -90,7 +135,10 @@ pub fn deinit(self: *const Fiber) void {
 
 pub fn switchThreadToFiber() !Fiber {
     return .{
-        .context = Registers.initFill(0),
+        .context = .{
+            .registers = Registers.initFill(0),
+            .simd = if (builtin.os.tag == .windows) SimdRegisters.initFill(0) else {},
+        },
         .stack_memory = null,
         .allocator = null,
     };
@@ -103,43 +151,65 @@ comptime {
             // from -> rcx
             // to -> rdx
             .x86_64 => asm (
-                \\.global switchTo;
+                \\.global switchTo
                 \\
                 \\switchTo:
                 \\
                 // store non-volatile registers into "from"
-                \\movq %rbx, 0x00(%rcx)
-                \\movq %rbp, 0x08(%rcx)
-                \\movq %rdi, 0x10(%rcx)
-                \\movq %rsi, 0x18(%rcx)
-                \\movq %r12, 0x20(%rcx)
-                \\movq %r13, 0x28(%rcx)
-                \\movq %r14, 0x30(%rcx)
-                \\movq %r15, 0x38(%rcx)
+                \\movq %rbx, 0*8(%rcx)
+                \\movq %rbp, 1*8(%rcx)
+                \\movq %rdi, 2*8(%rcx)
+                \\movq %rsi, 3*8(%rcx)
+                \\movq %r12, 4*8(%rcx)
+                \\movq %r13, 5*8(%rcx)
+                \\movq %r14, 6*8(%rcx)
+                \\movq %r15, 7*8(%rcx)
+                \\movups %xmm6, 8*10+16*0(%rcx)
+                \\movups %xmm7, 8*10+16*1(%rcx)
+                \\movups %xmm8, 8*10+16*2(%rcx)
+                \\movups %xmm9, 8*10+16*3(%rcx)
+                \\movups %xmm10, 8*10+16*4(%rcx)
+                \\movups %xmm11, 8*10+16*5(%rcx)
+                \\movups %xmm12, 8*10+16*6(%rcx)
+                \\movups %xmm13, 8*10+16*7(%rcx)
+                \\movups %xmm14, 8*10+16*8(%rcx)
+                \\movups %xmm15, 8*10+16*9(%rcx)
                 \\
                 // store return address
                 \\movq (%rsp), %r8
-                \\movq %r8, 0x50(%rcx)
+                \\movq %r8, 10*8(%rcx)
                 \\
                 // store stack pointer (skip return address)
                 \\leaq 0x08(%rsp), %r8
-                \\movq %r8, 0x48(%rcx)
+                \\movq %r8, 9*8(%rcx)
                 \\
                 // load "to" registers
-                \\movq 0x00(%rdx), %rbx
-                \\movq 0x08(%rdx), %rbp
-                \\movq 0x10(%rdx), %rdi
-                \\movq 0x18(%rdx), %rsi
-                \\movq 0x20(%rdx), %r12
-                \\movq 0x28(%rdx), %r13
-                \\movq 0x30(%rdx), %r14
-                \\movq 0x38(%rdx), %r15
-                \\movq 0x40(%rdx), %rcx
-                \\movq 0x48(%rdx), %rsp
+                \\movq 0*8(%rdx), %rbx
+                \\movq 1*8(%rdx), %rbp
+                \\movq 2*8(%rdx), %rdi
+                \\movq 3*8(%rdx), %rsi
+                \\movq 4*8(%rdx), %r12
+                \\movq 5*8(%rdx), %r13
+                \\movq 6*8(%rdx), %r14
+                \\movq 7*8(%rdx), %r15
+                \\movq 8*8(%rdx), %rcx
+                \\movq 9*8(%rdx), %rsp
+                \\movups 8*10+16*0(%rdx), %xmm6
+                \\movups 8*10+16*1(%rdx), %xmm7
+                \\movups 8*10+16*2(%rdx), %xmm8
+                \\movups 8*10+16*3(%rdx), %xmm9
+                \\movups 8*10+16*4(%rdx), %xmm10
+                \\movups 8*10+16*5(%rdx), %xmm11
+                \\movups 8*10+16*6(%rdx), %xmm12
+                \\movups 8*10+16*7(%rdx), %xmm13
+                \\movups 8*10+16*8(%rdx), %xmm14
+                \\movups 8*10+16*9(%rdx), %xmm15
                 \\
                 // jmp to instruction
-                \\movq 0x50(%rdx), %rax
-                \\jmpq *%rax
+                \\movq 10*8(%rdx), %r8
+                \\pushq %r8
+                \\xorq %rax, %rax
+                \\ret
             ),
             else => architectureUnsupported(),
         },
@@ -147,39 +217,41 @@ comptime {
             // from -> rdi
             // to -> rsi
             .x86_64 => asm (
-                \\.global switchTo;
+                \\.global switchTo
                 \\
                 \\switchTo:
                 \\
                 // store non-volatile registers into "from"
-                \\movq %rbx, 0x00(%rdi)
-                \\movq %rbp, 0x08(%rdi)
-                \\movq %r12, 0x10(%rdi)
-                \\movq %r13, 0x18(%rdi)
-                \\movq %r14, 0x20(%rdi)
-                \\movq %r15, 0x28(%rdi)
+                \\movq %rbx, 0*8(%rdi)
+                \\movq %rbp, 1*8(%rdi)
+                \\movq %r12, 2*8(%rdi)
+                \\movq %r13, 3*8(%rdi)
+                \\movq %r14, 4*8(%rdi)
+                \\movq %r15, 5*8(%rdi)
                 \\
                 // store return address
                 \\movq (%rsp), %r8
-                \\movq %r8, 0x40(%rdi)
+                \\movq %r8, 8*8(%rdi)
                 \\
                 // store stack pointer (skip return address)
                 \\leaq 0x08(%rsp), %r8
-                \\movq %r8, 0x38(%rdi)
+                \\movq %r8, 7*8(%rdi)
                 \\
                 // load "to" registers
-                \\movq 0x00(%rsi), %rbx
-                \\movq 0x08(%rsi), %rbp
-                \\movq 0x10(%rsi), %r12
-                \\movq 0x18(%rsi), %r13
-                \\movq 0x20(%rsi), %r14
-                \\movq 0x28(%rsi), %r15
-                \\movq 0x30(%rsi), %rdi
-                \\movq 0x38(%rsi), %rsp
+                \\movq 0*8(%rdi), %rbx
+                \\movq 1*8(%rdi), %rbp
+                \\movq 2*8(%rdi), %r12
+                \\movq 3*8(%rdi), %r13
+                \\movq 4*8(%rdi), %r14
+                \\movq 5*8(%rdi), %r15
+                \\movq 6*8(%rsi), %rdi
+                \\movq 7*8(%rsi), %rsp
                 \\
                 // jmp to instruction
-                \\movq 0x40(%rsi), %rax
-                \\jmpq *%rax
+                \\movq 8*8(%rsi), %r8
+                \\pushq %r8
+                \\xorq %rax, %rax
+                \\ret
             ),
             else => architectureUnsupported(),
         },
