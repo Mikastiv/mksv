@@ -176,11 +176,11 @@ comptime {
                 \\movups %xmm15, 8*10+16*9(%rcx)
                 \\
                 // store return address
-                \\movq (%rsp), %r8
+                \\movq 0*8(%rsp), %r8
                 \\movq %r8, 10*8(%rcx)
                 \\
                 // store stack pointer (skip return address)
-                \\leaq 0x08(%rsp), %r8
+                \\leaq 1*8(%rsp), %r8
                 \\movq %r8, 9*8(%rcx)
                 \\
                 // load "to" registers
@@ -230,11 +230,11 @@ comptime {
                 \\movq %r15, 5*8(%rdi)
                 \\
                 // store return address
-                \\movq (%rsp), %r8
+                \\movq 0*8(%rsp), %r8
                 \\movq %r8, 8*8(%rdi)
                 \\
                 // store stack pointer (skip return address)
-                \\leaq 0x08(%rsp), %r8
+                \\leaq 1*8(%rsp), %r8
                 \\movq %r8, 7*8(%rdi)
                 \\
                 // load "to" registers
