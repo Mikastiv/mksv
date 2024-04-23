@@ -18,9 +18,10 @@ pub const NonVolatileRegister = switch (builtin.os.tag) {
             r13 = 5,
             r14 = 6,
             r15 = 7,
-            rcx = 8, // first function argument
-            rsp = 9,
-            rip = 10,
+
+            argument = 8,
+            stack_pointer = 9,
+            program_counter = 10,
         },
         else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
     },
@@ -32,9 +33,10 @@ pub const NonVolatileRegister = switch (builtin.os.tag) {
             r13 = 3,
             r14 = 4,
             r15 = 5,
-            rdi = 6, // first function argument
-            rsp = 7,
-            rip = 8,
+
+            argument = 6,
+            stack_pointer = 7,
+            program_counter = 8,
         },
         else => @compileError("fibers not implemented for architecture " ++ @tagName(builtin.os.tag)),
     },
@@ -66,10 +68,11 @@ pub fn init(
 
     const stack_top = &memory[memory.len - @sizeOf(usize)];
     const context = Registers.initDefault(0, .{
-        .rip = @intFromPtr(func),
-        .rcx = @intFromPtr(arg),
-        .rsp = @intFromPtr(stack_top),
+        .program_counter = @intFromPtr(func),
+        .argument = @intFromPtr(arg),
+        .stack_pointer = @intFromPtr(stack_top),
     });
+    stack_top.* = 0; // set dummy return address to null
 
     return .{
         .context = context,
@@ -128,11 +131,7 @@ comptime {
                 \\movq 0x28(%rdx), %r13
                 \\movq 0x30(%rdx), %r14
                 \\movq 0x38(%rdx), %r15
-                \\
-                // load function param
                 \\movq 0x40(%rdx), %rcx
-                \\
-                // load stack pointer
                 \\movq 0x48(%rdx), %rsp
                 \\
                 // jmp to instruction
@@ -170,11 +169,7 @@ comptime {
                 \\movq 0x18(%rsi), %r13
                 \\movq 0x20(%rsi), %r14
                 \\movq 0x28(%rsi), %r15
-                \\
-                // load function param
-                \\movq 30(%rsi), %rdi
-                \\
-                // load stack pointer
+                \\movq 0x30(%rsi), %rdi
                 \\movq 0x38(%rsi), %rsp
                 \\
                 // jmp to instruction
