@@ -105,20 +105,18 @@ pub fn init(
     const end = if (builtin.os.tag == .windows)
         memory.len
     else
-        std.mem.alignBackward(usize, memory.len - red_zone_bytes, stack_alignment);
+        memory.len - red_zone_bytes;
 
-    const stack_top = &memory[end - 8];
+    const stack_top: usize = @intFromPtr(memory.ptr + end);
 
     const context: Context = .{
         .registers = Registers.initDefault(0, .{
             .program_counter = @intFromPtr(func),
             .argument = @intFromPtr(arg),
-            .stack_pointer = @intFromPtr(stack_top),
+            .stack_pointer = std.mem.alignBackward(usize, stack_top, stack_alignment) - 8,
         }),
         .simd = if (builtin.os.tag == .windows) SimdRegisters.initFill(0) else {},
     };
-
-    stack_top.* = 0; // set dummy return address to null
 
     return .{
         .context = context,
@@ -164,16 +162,16 @@ comptime {
                 \\movq %r13, 5*8(%rcx)
                 \\movq %r14, 6*8(%rcx)
                 \\movq %r15, 7*8(%rcx)
-                \\movups %xmm6, 8*10+16*0(%rcx)
-                \\movups %xmm7, 8*10+16*1(%rcx)
-                \\movups %xmm8, 8*10+16*2(%rcx)
-                \\movups %xmm9, 8*10+16*3(%rcx)
-                \\movups %xmm10, 8*10+16*4(%rcx)
-                \\movups %xmm11, 8*10+16*5(%rcx)
-                \\movups %xmm12, 8*10+16*6(%rcx)
-                \\movups %xmm13, 8*10+16*7(%rcx)
-                \\movups %xmm14, 8*10+16*8(%rcx)
-                \\movups %xmm15, 8*10+16*9(%rcx)
+                \\movups %xmm6, 8*11+16*0(%rcx)
+                \\movups %xmm7, 8*11+16*1(%rcx)
+                \\movups %xmm8, 8*11+16*2(%rcx)
+                \\movups %xmm9, 8*11+16*3(%rcx)
+                \\movups %xmm10, 8*11+16*4(%rcx)
+                \\movups %xmm11, 8*11+16*5(%rcx)
+                \\movups %xmm12, 8*11+16*6(%rcx)
+                \\movups %xmm13, 8*11+16*7(%rcx)
+                \\movups %xmm14, 8*11+16*8(%rcx)
+                \\movups %xmm15, 8*11+16*9(%rcx)
                 \\
                 // store return address
                 \\movq 0*8(%rsp), %r8
@@ -194,16 +192,16 @@ comptime {
                 \\movq 7*8(%rdx), %r15
                 \\movq 8*8(%rdx), %rcx
                 \\movq 9*8(%rdx), %rsp
-                \\movups 8*10+16*0(%rdx), %xmm6
-                \\movups 8*10+16*1(%rdx), %xmm7
-                \\movups 8*10+16*2(%rdx), %xmm8
-                \\movups 8*10+16*3(%rdx), %xmm9
-                \\movups 8*10+16*4(%rdx), %xmm10
-                \\movups 8*10+16*5(%rdx), %xmm11
-                \\movups 8*10+16*6(%rdx), %xmm12
-                \\movups 8*10+16*7(%rdx), %xmm13
-                \\movups 8*10+16*8(%rdx), %xmm14
-                \\movups 8*10+16*9(%rdx), %xmm15
+                \\movups 8*11+16*0(%rdx), %xmm6
+                \\movups 8*11+16*1(%rdx), %xmm7
+                \\movups 8*11+16*2(%rdx), %xmm8
+                \\movups 8*11+16*3(%rdx), %xmm9
+                \\movups 8*11+16*4(%rdx), %xmm10
+                \\movups 8*11+16*5(%rdx), %xmm11
+                \\movups 8*11+16*6(%rdx), %xmm12
+                \\movups 8*11+16*7(%rdx), %xmm13
+                \\movups 8*11+16*8(%rdx), %xmm14
+                \\movups 8*11+16*9(%rdx), %xmm15
                 \\
                 // jmp to instruction
                 \\movq 10*8(%rdx), %r8
