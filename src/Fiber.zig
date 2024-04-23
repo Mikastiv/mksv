@@ -44,7 +44,8 @@ pub const NonVolatileRegister = switch (builtin.os.tag) {
 };
 
 pub const Registers = std.EnumArray(NonVolatileRegister, u64);
-pub const Fiber = @This();
+
+const Fiber = @This();
 
 comptime {
     assert(@offsetOf(Fiber, "context") == 0);
