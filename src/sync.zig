@@ -22,8 +22,12 @@ pub const SpinLock = struct {
     }
 
     pub fn lock(self: *SpinLock) void {
-        while (!self.tryLock()) {
-            std.atomic.spinLoopHint();
+        var counter: usize = 0;
+        while (!self.tryLock()) : (counter += 1) {
+            if (counter == 8) {
+                counter = 0;
+                std.atomic.spinLoopHint();
+            }
         }
     }
 
