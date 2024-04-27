@@ -17,6 +17,31 @@ pub fn BitStream(comptime Reader: type, comptime endian: std.builtin.Endian) typ
         }
 
         pub fn readBits(self: *Self, count: u4) !u8 {
+            const value = self.peekBits(count);
+
+            const bits_remaining = self.bitsRemaining();
+            assert(count <= bits_remaining);
+
+            if (endian == .big) {
+                if (bits_remaining - count == 0) {
+                    self.byte = null;
+                    self.bit_index = 7;
+                } else {
+                    self.bit_index -= count;
+                }
+            } else {
+                if (bits_remaining - count == 0) {
+                    self.byte = null;
+                    self.bit_index = 0;
+                } else {
+                    self.bit_index += count;
+                }
+            }
+
+            return value;
+        }
+
+        fn peekBits(self: *Self, count: u4) !u8 {
             assert(count > 0 and count <= 8);
 
             if (self.byte == null) {
@@ -34,22 +59,6 @@ pub fn BitStream(comptime Reader: type, comptime endian: std.builtin.Endian) typ
                 @intCast(self.bit_index);
             const mask: u8 = @intCast(((@as(u16, 1) << count) - 1) << shift);
             const value = (byte & mask) >> shift;
-
-            if (endian == .big) {
-                if (bits_remaining - count == 0) {
-                    self.byte = null;
-                    self.bit_index = 7;
-                } else {
-                    self.bit_index -= count;
-                }
-            } else {
-                if (bits_remaining - count == 0) {
-                    self.byte = null;
-                    self.bit_index = 0;
-                } else {
-                    self.bit_index += count;
-                }
-            }
 
             return if (endian == .big)
                 value
