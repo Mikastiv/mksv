@@ -41,7 +41,7 @@ pub fn BitStream(comptime Reader: type, comptime endian: std.builtin.Endian) typ
             return value;
         }
 
-        fn peekBits(self: *Self, count: u4) !u8 {
+        pub fn peekBits(self: *Self, count: u4) !u8 {
             assert(count > 0 and count <= 8);
 
             if (self.byte == null) {
