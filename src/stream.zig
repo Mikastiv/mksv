@@ -28,6 +28,8 @@ pub fn BitStream(comptime Reader: type, comptime endian: std.builtin.Endian) typ
 
             const byte = self.byte.?;
 
+            if (count == 8) return byte;
+
             const shift: u3 = @intCast(if (endian == .big) self.bit_index - (count - 1) else self.bit_index);
             const mask: u8 = @intCast(((@as(u16, 1) << count) - 1) << shift);
             const value = (byte & mask) >> shift;
