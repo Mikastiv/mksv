@@ -17,7 +17,7 @@ pub fn BitStream(comptime Reader: type, comptime endian: std.builtin.Endian) typ
         }
 
         pub fn readBits(self: *Self, count: u4) !u8 {
-            const value = self.peekBits(count);
+            const value = try self.peekBits(count);
 
             const bits_remaining = self.bitsRemaining();
             assert(count <= bits_remaining);
