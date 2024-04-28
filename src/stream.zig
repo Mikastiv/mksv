@@ -111,4 +111,6 @@ test "bit stream" {
     try testing.expectEqual(0b01, try bit_stream_little.readBits(2));
     try testing.expectEqual(0b01, try bit_stream_little.readBits(2));
     try testing.expectEqual(0b01, try bit_stream_little.readBits(2));
+
+    try testing.expectError(error.EndOfStream, bit_stream_little.readBits(8));
 }
