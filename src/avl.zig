@@ -55,13 +55,44 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
         pub fn insert(self: *Self, node: *Node) ?*Node {
             var node_preventing: ?*Node = null;
             self.root = insertRecursive(self.root, node, &node_preventing);
+
+            if (node_preventing == null) self.size += 1;
+
             return node_preventing;
         }
 
+        // pub fn remove(self: *Self, node: *Node) void {
+        //     _ = self; // autofix
+        //     _ = node; // autofix
+
+        // }
+
+        // fn removeRecursive(root: *?*Node, node: *Node) ?*Node {
+        //     if (root.* == null) return node;
+
+        //     const r = root.*.?;
+        //     switch (compareFn(&node.value, &r.value)) {
+        //         .lt => r.left = removeRecursive(r.left, node),
+        //         .gt => r.right = removeRecursive(r.right, node),
+        //         .eq => {
+        //             if (r.left == null) {
+        //                 root.* = null;
+        //                 return r.right;
+        //             } else if (r.right == null) {
+        //                 root.* = null;
+        //                 return r.left;
+        //             }
+
+        //             const min = Node.min(r.right.?);
+        //             r.value =
+        //         },
+        //     }
+        // }
+
         fn insertRecursive(root: ?*Node, node: *Node, node_preventing: *?*Node) ?*Node {
-            if (root == null) {
-                return node;
-            } else switch (compareFn(&node.value, &root.?.value)) {
+            if (root == null) return node;
+
+            switch (compareFn(&node.value, &root.?.value)) {
                 .lt => root.?.left = insertRecursive(root.?.left, node, node_preventing),
                 .gt => root.?.right = insertRecursive(root.?.right, node, node_preventing),
                 .eq => {
