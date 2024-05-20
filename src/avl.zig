@@ -53,29 +53,27 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
         }
 
         pub fn insert(self: *Self, node: *Node) ?*Node {
-            self.root = insertRecursive(self.root, node);
-            return null;
+            var node_preventing: ?*Node = null;
+            self.root = insertRecursive(self.root, node, &node_preventing);
+            return node_preventing;
         }
 
-        fn insertRecursive(root: ?*Node, node: *Node) ?*Node {
+        fn insertRecursive(root: ?*Node, node: *Node, node_preventing: *?*Node) ?*Node {
             if (root == null) {
                 return node;
             } else switch (compareFn(&node.value, &root.?.value)) {
-                .lt => {
-                    const ins = insertRecursive(root.?.left, node);
-                    if (ins == null) return null;
-                    root.?.left = ins;
+                .lt => root.?.left = insertRecursive(root.?.left, node, node_preventing),
+                .gt => root.?.right = insertRecursive(root.?.right, node, node_preventing),
+                .eq => {
+                    node_preventing.* = root;
+                    return root;
                 },
-                .gt => {
-                    const ins = insertRecursive(root.?.right, node);
-                    if (ins == null) return null;
-                    root.?.right = ins;
-                },
-                .eq => return null,
             }
 
+            if (node_preventing.* != null) return root;
+
             const r = root.?;
-            r.height = 1 + height(r);
+            r.height = 1 + @max(height(r.left), height(r.right));
 
             const bf = height(r.left) - height(r.right);
 
@@ -128,10 +126,7 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
         }
 
         fn height(node: ?*Node) isize {
-            if (node) |n| {
-                return @max(height(n.left), height(n.right));
-            }
-            return 0;
+            return if (node) |n| n.height else 0;
         }
 
         pub fn debugPrint(self: *const Self) !void {
