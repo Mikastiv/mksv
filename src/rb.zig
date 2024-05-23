@@ -210,13 +210,25 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
 
                 self.removeFix(x_parent.?);
             }
+
+            target.setParent(null);
+            target.left = null;
+            target.right = null;
+        }
+
+        pub fn removeKey(self: *Self, key: *const T) ?*Node {
+            assert(self.size > 0);
+
+            const target = self.find(key) orelse return null;
+            self.remove(target);
+
+            return target;
         }
 
         pub fn find(self: *Self, key: *const T) ?*Node {
             var ptr = self.root;
             while (ptr) |node| {
-                const order = compareFn(key, &node.value);
-                switch (order) {
+                switch (compareFn(key, &node.value)) {
                     .lt => ptr = node.left,
                     .gt => ptr = node.right,
                     .eq => return ptr,
@@ -607,8 +619,6 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
 
                 try traverseNodes(writer, r.right, "", "\\--", r.left != null, use_color);
                 try traverseNodes(writer, r.left, "", "---", false, use_color);
-
-                _ = try writer.write("\n");
             }
 
             std.debug.print("{s}\n", .{str.items});
