@@ -1,4 +1,7 @@
 const std = @import("std");
+const assert = std.debug.assert;
+
+const Allocator = std.mem.Allocator;
 
 pub fn Tree(
     comptime T: type,
@@ -20,14 +23,29 @@ pub fn Tree(
             children_count: u32,
         };
 
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
         root: ?*Node = null,
         size: usize = 0,
 
-        pub fn init(allocator: std.mem.Allocator) Self {
+        pub fn init(allocator: Allocator) Self {
             return .{
                 .allocator = allocator,
             };
+        }
+
+        pub fn insert(self: *Self, key: *const T) Allocator.Error!?*T {
+            if (self.root == null) {
+                const node = try self.allocator.create(Node);
+                node.items[0] = key.*;
+                node.items_count = 1;
+                node.children_count = 0;
+                return null;
+            }
+
+            const root = self.root.?;
+            if (root.items_count >= node_capacity) {
+                // split
+            }
         }
 
         pub fn find(self: *const Self, key: *const T) ?*T {
@@ -57,7 +75,7 @@ pub fn Tree(
             self.size = 0;
         }
 
-        fn clear(allocator: std.mem.Allocator, node: *Node) void {
+        fn clear(allocator: Allocator, node: *Node) void {
             for (node.children[0..node.children_count]) |ptr| {
                 clear(ptr);
             }

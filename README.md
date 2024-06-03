@@ -6,3 +6,4 @@ Zig library
 
 - SIMD maths for 3D graphics
 - Synchronisation locks
+- Red-black tree

@@ -91,7 +91,10 @@ test "node" {
     try testing.expectEqual(n.parent(), null);
 }
 
-pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.math.Order) type {
+pub fn Tree(
+    comptime T: type,
+    comptime compareFn: fn (*const T, *const T) std.math.Order,
+) type {
     return struct {
         pub const Node = TreeNode(T);
 
@@ -100,6 +103,8 @@ pub fn Tree(comptime T: type, comptime compareFn: fn (*const T, *const T) std.ma
         root: ?*Node = null,
         size: usize = 0,
 
+        // Inserts a node into the tree. If the key already exists, returns
+        // a pointer to the node preventing the insertion, otherwise returns null
         pub fn insert(self: *Self, node: *Node) ?*Node {
             var parent: ?*Node = undefined;
             const child = self.findPos(node, &parent);
